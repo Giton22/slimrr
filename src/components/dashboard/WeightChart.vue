@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { VisXYContainer, VisLine, VisArea, VisAxis, VisCrosshair, VisTooltip } from '@unovis/vue'
+import { VisXYContainer, VisLine, VisAxis, VisCrosshair, VisTooltip, VisScatter } from '@unovis/vue'
 import { useWeightStore } from '@/stores/weight'
 import { useUnits } from '@/composables/useUnits'
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
@@ -17,7 +17,7 @@ const chartConfig: ChartConfig = {
 }
 
 const data = computed(() =>
-  store.filteredEntries.map(e => ({
+  store.averagedEntries.map(e => ({
     date: new Date(e.date).getTime(),
     weight: convert(e.weightKg),
   })),
@@ -31,24 +31,33 @@ function formatDate(ms: number | Date): string {
 }
 
 const unitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
+
+const domainY = computed((): [number, number] => {
+  if (data.value.length === 0) return [0, 100]
+  const weights = data.value.map(d => d.weight)
+  const min = Math.min(...weights)
+  const max = Math.max(...weights)
+  return [Math.floor(min / 10) * 10, Math.ceil(max / 10) * 10]
+})
 </script>
 
 <template>
-  <ChartContainer :config="chartConfig" class="min-h-[300px] w-full">
-    <VisXYContainer :data="data" :margin="{ top: 10, right: 10, bottom: 30, left: 45 }">
-      <VisArea
-        :x="x"
-        :y="y"
-        color="var(--chart-1)"
-        :opacity="0.1"
-        :curve-type="'monotoneX'"
-      />
+  <ChartContainer :config="chartConfig" class="h-[280px] w-full">
+    <VisXYContainer :data="data" :margin="{ top: 10, right: 10, bottom: 30, left: 45 }" :domain-y="domainY">
       <VisLine
         :x="x"
         :y="y"
         color="var(--chart-1)"
         :line-width="2"
         :curve-type="'monotoneX'"
+      />
+      <VisScatter
+        :x="x"
+        :y="y"
+        color="none"
+        stroke-color="var(--chart-1)"
+        :stroke-width="2"
+        :size="8"
       />
       <VisAxis
         type="x"

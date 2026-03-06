@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { useColorMode } from '@vueuse/core'
+import { useTheme } from '@/composables/useTheme'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -9,11 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const mode = useColorMode({ emitAuto: true })
-
-function setMode(value: 'light' | 'dark' | 'auto') {
-  mode.value = value
-}
+const { theme, setTheme } = useTheme()
 </script>
 
 <template>
@@ -31,10 +27,28 @@ function setMode(value: 'light' | 'dark' | 'auto') {
         <span class="sr-only">Toggle theme</span>
       </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuItem @click="setMode('light')">Light</DropdownMenuItem>
-      <DropdownMenuItem @click="setMode('dark')">Dark</DropdownMenuItem>
-      <DropdownMenuItem @click="setMode('auto')">System</DropdownMenuItem>
+    <DropdownMenuContent align="end" :side-offset="8">
+      <DropdownMenuItem
+        :class="theme === 'light' ? 'bg-accent' : ''"
+        @click="setTheme('light')"
+      >
+        <Icon icon="lucide:sun" class="mr-2 h-4 w-4" />
+        Light
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        :class="theme === 'dark' ? 'bg-accent' : ''"
+        @click="setTheme('dark')"
+      >
+        <Icon icon="lucide:moon" class="mr-2 h-4 w-4" />
+        Dark
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        :class="theme === 'system' ? 'bg-accent' : ''"
+        @click="setTheme('system')"
+      >
+        <Icon icon="lucide:monitor" class="mr-2 h-4 w-4" />
+        System
+      </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

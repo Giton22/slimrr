@@ -1,82 +1,68 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useWeightStore } from '@/stores/weight'
-import { useUnits } from '@/composables/useUnits'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import StatCard from '@/components/dashboard/StatCard.vue'
-import WeightChart from '@/components/dashboard/WeightChart.vue'
-import TimeRangeSelect from '@/components/dashboard/TimeRangeSelect.vue'
-import LogWeightDialog from '@/components/dashboard/LogWeightDialog.vue'
-import RecentEntries from '@/components/dashboard/RecentEntries.vue'
+import { ref } from 'vue'
+import { Swiper, SwiperSlide } from 'swiper/vue'
+import { A11y } from 'swiper/modules'
+import type { Swiper as SwiperInstance } from 'swiper'
+import WeightSection from '@/components/dashboard/WeightSection.vue'
+import KcalSection from '@/components/dashboard/KcalSection.vue'
 
-const store = useWeightStore()
-const { format, formatDelta } = useUnits()
+import 'swiper/css'
 
-const bmiCategory = computed(() => {
-  const bmi = store.bmi
-  if (bmi === null) return ''
-  if (bmi < 18.5) return 'Underweight'
-  if (bmi < 25) return 'Normal'
-  if (bmi < 30) return 'Overweight'
-  return 'Obese'
-})
+const activeIndex = ref(0)
+const swiperInstance = ref<SwiperInstance | null>(null)
 
-const goalRemaining = computed(() => {
-  if (store.currentWeight === null) return null
-  return store.currentWeight - store.settings.goalWeightKg
-})
+function onSwiper(swiper: SwiperInstance) {
+  swiperInstance.value = swiper
+}
+
+function onSlideChange(swiper: SwiperInstance) {
+  activeIndex.value = swiper.activeIndex
+}
+
+function goToSlide(index: number) {
+  swiperInstance.value?.slideTo(index)
+}
 </script>
 
 <template>
-  <div class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-    <!-- Stat Cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        title="Current Weight"
-        :value="store.currentWeight !== null ? format(store.currentWeight) : '—'"
-        :description="store.latestEntry ? `as of ${store.latestEntry.date}` : undefined"
-      />
-      <StatCard
-        title="Goal Weight"
-        :value="format(store.settings.goalWeightKg)"
-        :description="goalRemaining !== null ? `${formatDelta(goalRemaining)} remaining` : undefined"
-      />
-      <StatCard
-        title="BMI"
-        :value="store.bmi !== null ? String(store.bmi) : '—'"
-        :description="bmiCategory"
-      />
-      <StatCard
-        title="7-Day Trend"
-        :value="store.weightTrend !== null ? formatDelta(store.weightTrend) : '—'"
-        :trend="store.weightTrend !== null ? (store.weightTrend < 0 ? 'down' : store.weightTrend > 0 ? 'up' : 'neutral') : undefined"
-        :trend-value="store.weightTrend !== null ? formatDelta(store.weightTrend) + '/week' : undefined"
-        description="vs previous 7 days"
+  <!-- Mobile: swipeable slides (hidden on lg+) -->
+  <div class="lg:hidden">
+    <Swiper
+      :modules="[A11y]"
+      :slides-per-view="1"
+      :space-between="0"
+      class="dashboard-swiper"
+      @swiper="onSwiper"
+      @slide-change="onSlideChange"
+    >
+      <SwiperSlide>
+        <div class="px-4 pb-16 pt-6 sm:px-6">
+          <WeightSection />
+        </div>
+      </SwiperSlide>
+      <SwiperSlide>
+        <div class="px-4 pb-16 pt-6 sm:px-6">
+          <KcalSection />
+        </div>
+      </SwiperSlide>
+    </Swiper>
+
+    <!-- Fixed dot indicator — always visible at bottom of screen -->
+    <div class="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-2 pb-safe py-3 lg:hidden">
+      <button
+        v-for="(_, i) in 2"
+        :key="i"
+        class="dashboard-dot"
+        :class="{ 'dashboard-dot--active': activeIndex === i }"
+        :aria-label="`Go to ${i === 0 ? 'Weight' : 'Calories'} section`"
+        @click="goToSlide(i)"
       />
     </div>
+  </div>
 
-    <!-- Chart -->
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Weight History</CardTitle>
-        <div class="flex items-center gap-2">
-          <TimeRangeSelect />
-          <LogWeightDialog />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <WeightChart />
-      </CardContent>
-    </Card>
-
-    <!-- Recent Entries -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Entries</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <RecentEntries />
-      </CardContent>
-    </Card>
+  <!-- Desktop: side-by-side 50/50 layout (hidden below lg) -->
+  <div class="mx-auto hidden max-w-[1600px] gap-6 px-6 py-6 lg:grid lg:grid-cols-2">
+    <WeightSection />
+    <KcalSection />
   </div>
 </template>

@@ -118,3 +118,36 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Swiper */
+.dashboard-swiper {
+  width: 100%;
+}
+
+/* Fixed dot indicator bar */
+.dashboard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--muted-foreground);
+  opacity: 0.35;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+}
+
+.dashboard-dot:hover {
+  opacity: 0.6;
+}
+
+.dashboard-dot--active {
+  background: var(--primary);
+  opacity: 1;
+  transform: scale(1.25);
+}
+
+/* Safe area inset for devices with home indicator */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
