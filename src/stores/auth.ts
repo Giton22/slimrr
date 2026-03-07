@@ -13,7 +13,6 @@ export const useAuthStore = defineStore('auth', () => {
   // Setup/first-run state
   // null = not yet checked, true = setup done, false = first launch
   const setupComplete = ref<boolean | null>(null)
-  const setupRecordId = ref<string>('')
 
   const isAuthenticated = computed(() => pb.authStore.isValid && currentUser.value !== null)
 
@@ -87,7 +86,6 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         const result = await checkSetupComplete()
         setupComplete.value = result.setupComplete
-        setupRecordId.value = result.recordId
         if (result.collectionMissing) {
           console.info('[checkSetup] app_config collection not found — treating as legacy instance (setup complete)')
         }
@@ -112,9 +110,7 @@ export const useAuthStore = defineStore('auth', () => {
    * (app_config updateRule requires a valid auth token).
    */
   async function completeSetup(): Promise<void> {
-    if (setupRecordId.value) {
-      await markSetupComplete(setupRecordId.value)
-    }
+    await markSetupComplete()
     setupComplete.value = true
   }
 

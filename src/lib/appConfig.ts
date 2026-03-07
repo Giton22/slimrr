@@ -3,7 +3,6 @@ import { pb } from '@/lib/pocketbase'
 
 export interface AppConfigResult {
   setupComplete: boolean
-  recordId: string
   /** true when app_config collection doesn't exist (legacy instance) */
   collectionMissing?: boolean
 }
@@ -23,13 +22,12 @@ export async function checkSetupComplete(): Promise<AppConfigResult> {
     const record = records.items[0]
     return {
       setupComplete: record?.setup_complete === true,
-      recordId: record?.id ?? '',
     }
   }
   catch (e: unknown) {
     if (e instanceof ClientResponseError && e.status === 404) {
       // Collection doesn't exist — this is a legacy instance with existing users.
-      return { setupComplete: true, recordId: '', collectionMissing: true }
+      return { setupComplete: true, collectionMissing: true }
     }
     throw e
   }
@@ -38,7 +36,16 @@ export async function checkSetupComplete(): Promise<AppConfigResult> {
 /**
  * Marks setup as complete. Requires the user to be authenticated
  * (the update rule on app_config is `@request.auth.id != ""`).
+ *
+ * Fetches the record fresh instead of relying on a cached ID, so this is
+ * safe even if the store was hydrated before the user authenticated.
  */
-export async function markSetupComplete(recordId: string): Promise<void> {
-  await pb.collection('app_config').update(recordId, { setup_complete: true })
+export async function markSetupComplete(): Promise<void> {
+  const records = await pb.collection('app_config').getList(1, 1)
+  const record = records.items[0]
+  if (!record) {
+    // No config record exists — nothing to mark, treat setup as complete.
+    return
+  }
+  await pb.collection('app_config').update(record.id, { setup_complete: true })
 }
