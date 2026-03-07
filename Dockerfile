@@ -1,16 +1,13 @@
 # ── Stage 1: Build the frontend ──────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
-# Install bun
-RUN npm install -g bun
-
 WORKDIR /app
 
 # Copy dependency manifests first for layer caching
-COPY package.json bun.lock ./
+COPY package.json package-lock.json ./
 
 # Install all dependencies (including devDependencies needed for build)
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # Copy the rest of the source
 COPY . .
@@ -18,7 +15,7 @@ COPY . .
 # Build the Vite SPA.
 # Use an explicit root-relative PocketBase URL so API calls stay on the
 # same origin and don't become route-relative on nested pages like /setup.
-RUN VITE_PB_URL="/" bun run build-only
+RUN VITE_PB_URL="/" npm run build-only
 
 # ── Stage 2: Runtime (PocketBase) ────────────────────────────────────────────
 FROM ghcr.io/muchobien/pocketbase:latest
