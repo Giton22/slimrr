@@ -2,12 +2,18 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { AuthRecord } from 'pocketbase'
 import { pb } from '@/lib/pocketbase'
+import { checkSetupComplete, markSetupComplete } from '@/lib/appConfig'
 
 export const useAuthStore = defineStore('auth', () => {
   // PocketBase persists auth state in localStorage automatically via authStore
   const currentUser = ref<AuthRecord | null>(pb.authStore.record)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+
+  // Setup/first-run state
+  // null = not yet checked, true = setup done, false = first launch
+  const setupComplete = ref<boolean | null>(null)
+  const setupRecordId = ref<string>('')
 
   const isAuthenticated = computed(() => pb.authStore.isValid && currentUser.value !== null)
 
@@ -62,14 +68,67 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  // In-flight promise to deduplicate concurrent checkSetup() calls
+  let _checkSetupPromise: Promise<boolean> | null = null
+
+  /**
+   * Check whether first-run setup has been completed.
+   * Safe to call multiple times — uses cached result after first fetch.
+   * Deduplicates concurrent calls so only one HTTP request is made.
+   */
+  async function checkSetup(): Promise<boolean> {
+    // Already resolved — return cached value
+    if (setupComplete.value !== null) return setupComplete.value
+
+    // Deduplicate: if a fetch is in flight, wait for it
+    if (_checkSetupPromise) return _checkSetupPromise
+
+    _checkSetupPromise = (async () => {
+      try {
+        const result = await checkSetupComplete()
+        setupComplete.value = result.setupComplete
+        setupRecordId.value = result.recordId
+        if (result.collectionMissing) {
+          console.info('[checkSetup] app_config collection not found — treating as legacy instance (setup complete)')
+        }
+      }
+      catch (e: unknown) {
+        // Network error or unexpected failure — fall back to login page so
+        // users aren't permanently locked out.
+        setupComplete.value = true
+        console.warn('[checkSetup] Unexpected error fetching app_config, assuming setup complete:', e)
+      }
+      finally {
+        _checkSetupPromise = null
+      }
+      return setupComplete.value!
+    })()
+
+    return _checkSetupPromise
+  }
+
+  /**
+   * Mark setup as complete. Must be called after the user is authenticated
+   * (app_config updateRule requires a valid auth token).
+   */
+  async function completeSetup(): Promise<void> {
+    if (setupRecordId.value) {
+      await markSetupComplete(setupRecordId.value)
+    }
+    setupComplete.value = true
+  }
+
   return {
     currentUser,
     isLoading,
     error,
     isAuthenticated,
+    setupComplete,
     login,
     register,
     logout,
     clearError,
+    checkSetup,
+    completeSetup,
   }
 })
