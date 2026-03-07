@@ -3,7 +3,10 @@ import type { RecordModel } from 'pocketbase'
 
 // ── PocketBase client (singleton) ──
 
-export const pb = new PocketBase(import.meta.env.VITE_PB_URL ?? 'http://localhost:8090')
+const configuredPbUrl = import.meta.env.VITE_PB_URL?.trim()
+const pocketbaseUrl = new URL(configuredPbUrl || '/', window.location.origin).toString()
+
+export const pb = new PocketBase(pocketbaseUrl)
 
 // Keep auth token fresh across page reloads automatically
 pb.autoCancellation(false)

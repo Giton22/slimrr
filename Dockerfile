@@ -16,9 +16,9 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 # Build the Vite SPA.
-# VITE_PB_URL is intentionally empty so the SDK uses relative URLs —
-# the frontend and API are served from the same origin (port 8090).
-RUN VITE_PB_URL="" bun run build-only
+# Use an explicit root-relative PocketBase URL so API calls stay on the
+# same origin and don't become route-relative on nested pages like /setup.
+RUN VITE_PB_URL="/" bun run build-only
 
 # ── Stage 2: Runtime (PocketBase) ────────────────────────────────────────────
 FROM ghcr.io/muchobien/pocketbase:latest
