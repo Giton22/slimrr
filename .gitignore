@@ -39,6 +39,10 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
+backend/pb_data
+backend/pb/pb_public/*
+!backend/pb/pb_public/.gitkeep
+
 # Environment variables
 .env
 .env.*

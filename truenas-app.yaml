@@ -1,0 +1,38 @@
+services:
+  bodyweight-tracker:
+    image: ghcr.io/giton22/bodyweight-tracker:latest
+    pull_policy: always
+    container_name: bodyweight-tracker
+    user: "568:568"
+    restart: unless-stopped
+
+    environment:
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-admin@example.com}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-changeme123}
+
+    ports:
+      - "8090:8090"
+
+    volumes:
+      # IMPORTANT: Update the host path to your TrueNAS dataset
+      - /mnt/tank/apps/bodyweight-tracker/pb_data:/pb/pb_data:rw
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  default:
+    driver: bridge
