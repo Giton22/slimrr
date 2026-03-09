@@ -192,10 +192,10 @@ export const useWeightStore = defineStore('weight', () => {
   }
 
   function unsubscribeRealtime() {
-    pb.collection(COLLECTIONS.WEIGHT_ENTRIES).unsubscribe('*').catch(() => {})
-    pb.collection(COLLECTIONS.CALORIE_ENTRIES).unsubscribe('*').catch(() => {})
-    pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).unsubscribe('*').catch(() => {})
-    pb.collection(COLLECTIONS.USER_SETTINGS).unsubscribe('*').catch(() => {})
+    pb.collection(COLLECTIONS.WEIGHT_ENTRIES).unsubscribe('*')
+    pb.collection(COLLECTIONS.CALORIE_ENTRIES).unsubscribe('*')
+    pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).unsubscribe('*')
+    pb.collection(COLLECTIONS.USER_SETTINGS).unsubscribe('*')
   }
 
   function reset() {
