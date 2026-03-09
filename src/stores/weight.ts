@@ -1,8 +1,9 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { CalorieEntry, DailyCalorieRow, KcalGoalChange, Sex, TimeRange, UserSettings, WeightEntry } from '@/types'
+import type { CalorieEntry, DailyCalorieRow, GoalDirection, KcalGoalChange, Sex, TimeRange, UserSettings, WeightEntry } from '@/types'
 import { pb, COLLECTIONS } from '@/lib/pocketbase'
 import type { WeightEntryRecord, CalorieEntryRecord, KcalGoalChangeRecord, UserSettingsRecord } from '@/lib/pocketbase'
+import { useGroupsStore } from '@/stores/groups'
 
 type AverageMode = 'daily' | 'weekly' | 'monthly'
 
@@ -44,6 +45,7 @@ function toUserSettings(r: UserSettingsRecord): UserSettings {
     heightCm: r.height_cm,
     dateOfBirth: r.date_of_birth || undefined,
     sex: (r.sex as Sex) || undefined,
+    goalDirection: (r.goal_direction as GoalDirection) || undefined,
   }
 }
 
@@ -224,6 +226,7 @@ export const useWeightStore = defineStore('weight', () => {
       height_cm: next.heightCm,
       date_of_birth: next.dateOfBirth ?? '',
       sex: next.sex ?? '',
+      goal_direction: next.goalDirection ?? '',
     }
 
     if (settingsRecordId.value) {
@@ -232,6 +235,13 @@ export const useWeightStore = defineStore('weight', () => {
     else {
       const rec = await pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).create(payload)
       settingsRecordId.value = rec.id
+    }
+
+    // Sync weight goal for groups when goal weight changes
+    const sorted = [...entries.value].sort((a, b) => a.date.localeCompare(b.date))
+    const latestWeight = sorted.at(-1)?.weightKg
+    if (next.goalWeightKg && latestWeight) {
+      useGroupsStore().syncWeightGoal(latestWeight, next.goalWeightKg, next.unit, next.goalDirection)
     }
   }
 
@@ -504,6 +514,11 @@ export const useWeightStore = defineStore('weight', () => {
         }
       }
       catch { /* silently fail */ }
+    }
+
+    // Sync weight goal for groups
+    if (settings.value.goalWeightKg) {
+      useGroupsStore().syncWeightGoal(entry.weightKg, settings.value.goalWeightKg, settings.value.unit, settings.value.goalDirection)
     }
   }
 

@@ -30,11 +30,48 @@ export interface DailyCalorieRow {
   note?: string
 }
 
+export type GoalVisibility = 'private' | 'group' | 'public'
+export type GoalStatus = 'active' | 'completed' | 'abandoned'
+export type GroupRole = 'owner' | 'member'
+
+export interface Group {
+  id: string
+  name: string
+  description?: string
+  inviteCode: string
+  createdBy: string
+}
+
+export interface GroupMember {
+  id: string
+  group: string
+  user: string
+  role: GroupRole
+  expand?: {
+    user?: { id: string; name?: string; username?: string; email?: string }
+  }
+}
+
+export interface Goal {
+  id: string
+  user: string
+  title: string
+  description?: string
+  targetValue?: number
+  currentValue: number
+  unit?: string
+  visibility: GoalVisibility
+  status: GoalStatus
+  dueDate?: string
+  updated: string
+}
+
 export type WeightUnit = 'kg' | 'lbs'
 
 export type TimeRange = 7 | 30 | 60 | 90
 
 export type Sex = 'male' | 'female'
+export type GoalDirection = 'loss' | 'gain'
 
 export interface UserSettings {
   unit: WeightUnit
@@ -42,4 +79,5 @@ export interface UserSettings {
   heightCm: number
   dateOfBirth?: string // YYYY-MM-DD
   sex?: Sex
+  goalDirection?: GoalDirection
 }

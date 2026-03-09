@@ -38,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(email: string, password: string) {
+  async function register(email: string, password: string, name?: string) {
     isLoading.value = true
     error.value = null
     try {
@@ -46,6 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
         email,
         password,
         passwordConfirm: password,
+        ...(name ? { name } : {}),
       })
       // Auto-login after successful registration
       await login(email, password)
@@ -57,6 +58,13 @@ export const useAuthStore = defineStore('auth', () => {
     finally {
       isLoading.value = false
     }
+  }
+
+  async function updateName(name: string) {
+    const userId = pb.authStore.record?.id
+    if (!userId) return
+    await pb.collection('users').update(userId, { name })
+    currentUser.value = pb.authStore.record
   }
 
   function logout() {
@@ -125,6 +133,7 @@ export const useAuthStore = defineStore('auth', () => {
     setupComplete,
     login,
     register,
+    updateName,
     logout,
     clearError,
     checkSetup,

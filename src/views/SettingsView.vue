@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useWeightStore } from '@/stores/weight'
+import { useAuthStore } from '@/stores/auth'
 import { useUnits } from '@/composables/useUnits'
 import BmiGauge from '@/components/settings/BmiGauge.vue'
 import { Button } from '@/components/ui/button'
@@ -27,14 +28,17 @@ import { Badge } from '@/components/ui/badge'
 
 const router = useRouter()
 const store = useWeightStore()
+const auth = useAuthStore()
 const { isKg, format, formatDelta } = useUnits()
 
 // ── Form state (local draft — only saved on submit) ──
 
+const displayName = ref(auth.currentUser?.name ?? '')
 const heightCm = ref(store.settings.heightCm ? String(store.settings.heightCm) : '')
 const goalWeightInput = ref('')
 const dateOfBirth = ref(store.settings.dateOfBirth ?? '')
 const sexValue = ref<string>(store.settings.sex ?? '')
+const goalDirectionValue = ref<string>(store.settings.goalDirection ?? '')
 
 // Saving state
 const isSaving = ref(false)
@@ -83,9 +87,22 @@ watch(
   },
 )
 
+watch(
+  () => store.settings.goalDirection,
+  (d) => {
+    if (d) goalDirectionValue.value = d
+  },
+  { immediate: true },
+)
+
 async function saveSettings() {
   isSaving.value = true
   saveSuccess.value = false
+
+  const trimmedName = displayName.value.trim()
+  if (trimmedName !== (auth.currentUser?.name ?? '')) {
+    await auth.updateName(trimmedName)
+  }
 
   const heightParsed = Number.parseFloat(heightCm.value)
   const goalKg = displayToKg(goalWeightInput.value)
@@ -95,6 +112,7 @@ async function saveSettings() {
     goalWeightKg: goalKg > 0 ? goalKg : store.settings.goalWeightKg,
     dateOfBirth: dateOfBirth.value || undefined,
     sex: (sexValue.value as 'male' | 'female') || undefined,
+    goalDirection: (goalDirectionValue.value as 'loss' | 'gain') || undefined,
   })
 
   isSaving.value = false
@@ -191,6 +209,23 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
         </CardHeader>
         <CardContent>
           <form class="grid gap-5" @submit.prevent="saveSettings">
+            <!-- Display Name -->
+            <div class="grid gap-1.5">
+              <Label for="display-name">Display Name</Label>
+              <Input
+                id="display-name"
+                v-model="displayName"
+                type="text"
+                placeholder="How others will see you in groups"
+                class="max-w-[280px]"
+              />
+              <p class="text-xs text-muted-foreground">
+                Visible to other group members.
+              </p>
+            </div>
+
+            <Separator />
+
             <!-- Height -->
             <div class="grid gap-1.5">
               <Label for="height">Height (cm)</Label>
@@ -230,6 +265,34 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
                 />
                 <span class="text-sm text-muted-foreground">{{ weightUnitLabel }}</span>
               </div>
+            </div>
+
+            <Separator />
+
+            <!-- Goal Direction -->
+            <div class="grid gap-1.5">
+              <Label>Goal Direction</Label>
+              <div class="flex gap-2">
+                <Button
+                  type="button"
+                  :variant="goalDirectionValue === 'loss' ? 'default' : 'outline'"
+                  size="sm"
+                  @click="goalDirectionValue = 'loss'"
+                >
+                  Weight Loss
+                </Button>
+                <Button
+                  type="button"
+                  :variant="goalDirectionValue === 'gain' ? 'default' : 'outline'"
+                  size="sm"
+                  @click="goalDirectionValue = 'gain'"
+                >
+                  Weight Gain
+                </Button>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                Used to calculate progress in group goals.
+              </p>
             </div>
 
             <Separator />

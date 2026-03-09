@@ -29,7 +29,11 @@ function logout() {
         <Icon icon="lucide:scale" class="h-6 w-6 text-primary" />
         <h1 class="text-lg font-semibold">Bodyweight Tracker</h1>
       </RouterLink>
-      <div class="flex items-center gap-2">
+      <nav v-if="auth.isAuthenticated" class="ml-6 hidden sm:flex items-center gap-4">
+        <RouterLink to="/" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Dashboard</RouterLink>
+        <RouterLink to="/groups" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Groups</RouterLink>
+      </nav>
+      <div class="flex items-center gap-2 ml-auto">
         <ModeToggle />
 
         <DropdownMenu v-if="auth.isAuthenticated">
@@ -41,9 +45,18 @@ function logout() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel class="font-normal">
               <p class="text-xs text-muted-foreground">Signed in as</p>
-              <p class="truncate text-sm font-medium">{{ auth.currentUser?.email }}</p>
+              <p class="truncate text-sm font-medium">{{ auth.currentUser?.name || auth.currentUser?.email }}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem class="sm:hidden" @click="router.push('/')">
+              <Icon icon="lucide:layout-dashboard" class="mr-2 h-4 w-4" />
+              Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuItem class="sm:hidden" @click="router.push('/groups')">
+              <Icon icon="lucide:users" class="mr-2 h-4 w-4" />
+              Groups
+            </DropdownMenuItem>
+            <DropdownMenuSeparator class="sm:hidden" />
             <DropdownMenuItem @click="router.push('/settings')">
               <Icon icon="lucide:settings" class="mr-2 h-4 w-4" />
               Settings

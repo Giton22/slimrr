@@ -12,6 +12,7 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const mode = ref<'login' | 'register'>('login')
+const displayName = ref('')
 const email = ref('')
 const password = ref('')
 const passwordConfirm = ref('')
@@ -40,7 +41,7 @@ async function submit() {
       router.push('/')
     }
     else {
-      await auth.register(email.value.trim(), password.value)
+      await auth.register(email.value.trim(), password.value, displayName.value.trim() || undefined)
       router.push('/settings')
     }
   }
@@ -66,6 +67,16 @@ async function submit() {
       </CardHeader>
       <CardContent>
         <form class="flex flex-col gap-4" @submit.prevent="submit">
+          <div v-if="mode === 'register'" class="flex flex-col gap-1.5">
+            <Label for="display-name">Display Name</Label>
+            <Input
+              id="display-name"
+              v-model="displayName"
+              type="text"
+              placeholder="How others will see you"
+              autocomplete="name"
+            />
+          </div>
           <div class="flex flex-col gap-1.5">
             <Label for="email">Email</Label>
             <Input

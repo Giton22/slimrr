@@ -42,6 +42,32 @@ export interface UserSettingsRecord extends RecordModel {
   height_cm: number
   date_of_birth: string // YYYY-MM-DD or ''
   sex: 'male' | 'female' | ''
+  goal_direction: 'loss' | 'gain' | ''
+}
+
+export interface GroupRecord extends RecordModel {
+  name: string
+  description: string
+  invite_code: string
+  created_by: string
+}
+
+export interface GroupMemberRecord extends RecordModel {
+  group: string
+  user: string
+  role: 'owner' | 'member'
+}
+
+export interface GoalRecord extends RecordModel {
+  user: string
+  title: string
+  description: string
+  target_value: number
+  current_value: number
+  unit: string
+  visibility: 'private' | 'group' | 'public'
+  status: 'active' | 'completed' | 'abandoned'
+  due_date: string
 }
 
 // ── Collection name constants ──
@@ -51,4 +77,7 @@ export const COLLECTIONS = {
   CALORIE_ENTRIES: 'calorie_entries',
   KCAL_GOAL_HISTORY: 'kcal_goal_history',
   USER_SETTINGS: 'user_settings',
+  GROUPS: 'groups',
+  GROUP_MEMBERS: 'group_members',
+  GOALS: 'goals',
 } as const
