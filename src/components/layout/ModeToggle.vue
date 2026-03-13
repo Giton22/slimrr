@@ -29,14 +29,14 @@ const { theme, setTheme } = useTheme()
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" :side-offset="8">
       <DropdownMenuItem
-        :class="theme === 'light' ? 'bg-accent' : ''"
+        :class="[theme === 'light' ? 'bg-accent' : '', 'mb-1']"
         @click="setTheme('light')"
       >
         <Icon icon="lucide:sun" class="mr-2 h-4 w-4" />
         Light
       </DropdownMenuItem>
       <DropdownMenuItem
-        :class="theme === 'dark' ? 'bg-accent' : ''"
+        :class="[theme === 'dark' ? 'bg-accent' : '', 'mb-1']"
         @click="setTheme('dark')"
       >
         <Icon icon="lucide:moon" class="mr-2 h-4 w-4" />

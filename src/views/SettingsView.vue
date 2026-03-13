@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import { useWeightStore } from '@/stores/weight'
 import { useAuthStore } from '@/stores/auth'
 import { useUnits } from '@/composables/useUnits'
+import { useTheme, type ColorTheme } from '@/composables/useTheme'
 import { useNumericField } from '@/composables/useNumericField'
 import { BMI_CATEGORIES } from '@/composables/useBmi'
 import BmiGauge from '@/components/settings/BmiGauge.vue'
@@ -41,6 +42,14 @@ const router = useRouter()
 const store = useWeightStore()
 const auth = useAuthStore()
 const { isKg, convert, toKg, format, formatDelta } = useUnits()
+const { colorTheme, setColorTheme, colorThemes } = useTheme()
+
+function setColorThemeByValue(value: unknown) {
+  if (typeof value !== 'string') return
+  if (value === 'classic' || value === 'darcula' || value === 'nord' || value === 'solarized' || value === 'gruvbox') {
+    setColorTheme(value as ColorTheme)
+  }
+}
 
 // ── Form state (local draft — only saved on submit) ──
 
@@ -365,6 +374,30 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
               </Select>
               <p class="text-xs text-muted-foreground">
                 Optional — used for body composition context.
+              </p>
+            </div>
+
+            <Separator />
+
+            <!-- App Color Theme -->
+            <div class="grid gap-1.5">
+              <Label for="app-theme">App Theme</Label>
+              <Select :model-value="colorTheme" @update:model-value="setColorThemeByValue">
+                <SelectTrigger id="app-theme" class="max-w-[240px]">
+                  <SelectValue placeholder="Select a theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in colorThemes"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p class="text-xs text-muted-foreground">
+                Includes Classic (default), Darcula, Nord, Solarized, and Gruvbox.
               </p>
             </div>
 
