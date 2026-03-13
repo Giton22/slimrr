@@ -50,7 +50,7 @@ const tickStyles = computed(() =>
 <template>
   <div class="w-full select-none">
     <!-- Gauge bar -->
-    <div class="relative h-6 w-full overflow-visible rounded-full">
+    <div class="relative h-6 w-full overflow-hidden rounded-full">
       <!-- Colored segments -->
       <div
         v-for="seg in segmentStyles"
@@ -71,7 +71,8 @@ const tickStyles = computed(() =>
       <!-- BMI position marker -->
       <template v-if="markerPosition !== null">
         <div
-          class="absolute top-1/2 z-10 h-8 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground shadow-md ring-2 ring-background"
+          class="absolute top-1/2 z-10 h-8 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-2 ring-background"
+          style="box-shadow: 0 0 6px oklch(0.16 0.02 55 / 0.4), 0 2px 4px oklch(0.16 0.02 55 / 0.3);"
           :style="{ left: markerPosition }"
         />
       </template>

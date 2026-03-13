@@ -48,9 +48,10 @@ const progress = computed(() => {
         <span class="text-muted-foreground">{{ goal.targetValue }} {{ goal.unit || '' }}</span>
       </div>
 
-      <div v-if="progress !== null" class="h-2 w-full rounded-full bg-muted">
+      <div v-if="progress !== null" class="h-2 w-full rounded-full bg-muted overflow-hidden">
         <div
-          class="h-2 rounded-full bg-primary transition-all"
+          class="h-2 rounded-full transition-all duration-500"
+          :class="progress >= 100 ? 'bg-success' : 'bg-gradient-to-r from-primary to-primary/60'"
           :style="{ width: `${progress}%` }"
         />
       </div>

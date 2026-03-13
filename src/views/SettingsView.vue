@@ -2,9 +2,11 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import { toast } from 'vue-sonner'
 import { useWeightStore } from '@/stores/weight'
 import { useAuthStore } from '@/stores/auth'
 import { useUnits } from '@/composables/useUnits'
+import { useNumericField } from '@/composables/useNumericField'
 import { BMI_CATEGORIES } from '@/composables/useBmi'
 import BmiGauge from '@/components/settings/BmiGauge.vue'
 import { Button } from '@/components/ui/button'
@@ -26,6 +28,14 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const router = useRouter()
 const store = useWeightStore()
@@ -35,15 +45,20 @@ const { isKg, convert, toKg, format, formatDelta } = useUnits()
 // ── Form state (local draft — only saved on submit) ──
 
 const displayName = ref(auth.currentUser?.name ?? '')
-const heightCm = ref(store.settings.heightCm ? String(store.settings.heightCm) : '')
-const goalWeightInput = ref('')
+const heightField = useNumericField({ min: 50, max: 300, required: false })
+const goalWeightField = useNumericField({ min: 20, max: 500, required: false })
 const dateOfBirth = ref(store.settings.dateOfBirth ?? '')
+
+// Initialize height field
+if (store.settings.heightCm) heightField.reset(store.settings.heightCm)
 const sexValue = ref<string>(store.settings.sex ?? '')
 const goalDirectionValue = ref<string>(store.settings.goalDirection ?? '')
 
 // Saving state
 const isSaving = ref(false)
 const saveSuccess = ref(false)
+const resetDialogOpen = ref(false)
+const isResettingData = ref(false)
 
 // Convert stored kg goal to display unit string
 function kgToDisplayStr(kg: number): string {
@@ -60,7 +75,7 @@ function parseDisplayToKg(val: string): number {
 watch(
   [() => store.settings.goalWeightKg, isKg],
   ([kg]) => {
-    goalWeightInput.value = kg ? kgToDisplayStr(kg) : ''
+    goalWeightField.reset(kg ? convert(kg) : undefined)
   },
   { immediate: true },
 )
@@ -69,7 +84,7 @@ watch(
 watch(
   () => store.settings.heightCm,
   (cm) => {
-    if (cm && !heightCm.value) heightCm.value = String(cm)
+    if (cm && !heightField.displayValue.value) heightField.reset(cm)
   },
 )
 
@@ -96,6 +111,10 @@ watch(
 )
 
 async function saveSettings() {
+  const heightValid = heightField.validate()
+  const goalValid = goalWeightField.validate()
+  if (!heightValid || !goalValid) return
+
   isSaving.value = true
   saveSuccess.value = false
 
@@ -104,11 +123,13 @@ async function saveSettings() {
     await auth.updateName(trimmedName)
   }
 
-  const heightParsed = Number.parseFloat(heightCm.value)
-  const goalKg = parseDisplayToKg(goalWeightInput.value)
+  const heightParsed = heightField.numericValue.value
+  const goalKg = goalWeightField.numericValue.value
+    ? parseDisplayToKg(goalWeightField.displayValue.value)
+    : 0
 
   await store.persistSettings({
-    heightCm: Number.isNaN(heightParsed) ? store.settings.heightCm : heightParsed,
+    heightCm: heightParsed ?? store.settings.heightCm,
     goalWeightKg: goalKg > 0 ? goalKg : store.settings.goalWeightKg,
     dateOfBirth: dateOfBirth.value || undefined,
     sex: (sexValue.value as 'male' | 'female') || undefined,
@@ -118,6 +139,24 @@ async function saveSettings() {
   isSaving.value = false
   saveSuccess.value = true
   setTimeout(() => { saveSuccess.value = false }, 2000)
+}
+
+async function resetUserData() {
+  if (isResettingData.value) return
+
+  isResettingData.value = true
+  try {
+    await store.resetUserData()
+    resetDialogOpen.value = false
+    toast.success('Your tracking data has been fully reset.')
+    router.push('/')
+  }
+  catch {
+    toast.error('Failed to reset your data. Please try again.')
+  }
+  finally {
+    isResettingData.value = false
+  }
 }
 
 // ── BMI display helpers ──
@@ -164,14 +203,15 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
-    <!-- Back button -->
-    <div class="mb-6 flex items-center gap-2">
-      <Button variant="ghost" size="icon" @click="router.push('/')">
-        <Icon icon="lucide:arrow-left" class="h-4 w-4" />
-      </Button>
-      <h2 class="text-xl font-semibold">Settings</h2>
-    </div>
+  <div>
+    <div class="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+      <!-- Back button -->
+      <div class="mb-6 flex items-center gap-2">
+        <Button variant="ghost" size="icon" @click="router.push('/')">
+          <Icon icon="lucide:arrow-left" class="h-4 w-4" />
+        </Button>
+        <h2 class="text-xl font-semibold">Settings</h2>
+      </div>
 
     <!-- New user profile setup banner -->
     <div
@@ -187,9 +227,9 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
       </div>
     </div>
 
-    <div class="flex flex-col gap-6">
-      <!-- ── Profile Settings Card ── -->
-      <Card>
+      <div class="flex flex-col gap-6">
+        <!-- ── Profile Settings Card ── -->
+        <Card class="shadow-warm">
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Icon icon="lucide:user" class="h-5 w-5 text-primary" />
@@ -224,16 +264,19 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
               <div class="flex items-center gap-2">
                 <Input
                   id="height"
-                  v-model="heightCm"
-                  type="number"
-                  min="50"
-                  max="300"
-                  step="0.1"
+                  v-model="heightField.displayValue.value"
+                  type="text"
+                  inputmode="decimal"
                   placeholder="e.g. 178"
                   class="max-w-[160px]"
+                  v-bind="heightField.inputAttrs.value"
+                  :class="{ 'animate-shake': heightField.shaking.value }"
                 />
                 <span class="text-sm text-muted-foreground">cm</span>
               </div>
+              <p v-if="heightField.error.value" class="text-xs text-destructive">
+                {{ heightField.error.value }}
+              </p>
               <p class="text-xs text-muted-foreground">
                 Always stored in centimetres regardless of unit setting.
               </p>
@@ -247,16 +290,19 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
               <div class="flex items-center gap-2">
                 <Input
                   id="goal-weight"
-                  v-model="goalWeightInput"
-                  type="number"
-                  min="20"
-                  max="500"
-                  step="0.1"
+                  v-model="goalWeightField.displayValue.value"
+                  type="text"
+                  inputmode="decimal"
                   :placeholder="`e.g. ${isKg ? '75' : '165'}`"
                   class="max-w-[160px]"
+                  v-bind="goalWeightField.inputAttrs.value"
+                  :class="{ 'animate-shake': goalWeightField.shaking.value }"
                 />
                 <span class="text-sm text-muted-foreground">{{ weightUnitLabel }}</span>
               </div>
+              <p v-if="goalWeightField.error.value" class="text-xs text-destructive">
+                {{ goalWeightField.error.value }}
+              </p>
             </div>
 
             <Separator />
@@ -361,12 +407,31 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
                 </span>
               </Transition>
             </div>
+
+            <Separator />
+
+            <div class="grid gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+              <p class="text-sm font-medium text-destructive">Danger Zone</p>
+              <p class="text-xs text-muted-foreground">
+                Reset all tracking data (weight entries, calorie history, and goals). This action cannot be undone.
+              </p>
+              <div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  :disabled="isResettingData"
+                  @click="resetDialogOpen = true"
+                >
+                  Reset All My Data
+                </Button>
+              </div>
+            </div>
           </form>
         </CardContent>
-      </Card>
+        </Card>
 
-      <!-- ── BMI Overview Card ── -->
-      <Card>
+        <!-- ── BMI Overview Card ── -->
+        <Card class="shadow-warm">
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Icon icon="lucide:activity" class="h-5 w-5 text-primary" />
@@ -518,8 +583,31 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
+
+    <Dialog :open="resetDialogOpen" @update:open="resetDialogOpen = $event">
+      <DialogContent class="sm:max-w-[460px]">
+        <DialogHeader>
+          <DialogTitle>Reset all your tracking data?</DialogTitle>
+          <DialogDescription>
+            This permanently deletes your weight entries, calorie entries, calorie goal history, and goals.
+            Your account, settings, and group memberships will stay unchanged.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" :disabled="isResettingData" @click="resetDialogOpen = false">
+            Cancel
+          </Button>
+          <Button variant="destructive" :disabled="isResettingData" @click="resetUserData">
+            <Icon v-if="isResettingData" icon="lucide:loader-circle" class="mr-2 h-4 w-4 animate-spin" />
+            <Icon v-else icon="lucide:trash-2" class="mr-2 h-4 w-4" />
+            {{ isResettingData ? 'Resetting...' : 'Yes, reset data' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

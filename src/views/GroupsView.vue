@@ -54,7 +54,7 @@ function onJoined(groupId: string) {
       <Card
         v-for="group in store.myGroups"
         :key="group.id"
-        class="cursor-pointer transition-colors hover:bg-muted/50"
+        class="cursor-pointer transition-all duration-200 hover:bg-muted/50 hover:shadow-warm hover:-translate-y-0.5"
         @click="router.push(`/groups/${group.id}`)"
       >
         <CardHeader class="pb-2">

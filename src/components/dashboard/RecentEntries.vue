@@ -71,14 +71,15 @@ async function executeDelete() {
     </TableHeader>
     <TableBody>
       <TableRow v-if="recentEntries.length === 0">
-        <TableCell colspan="4" class="py-8 text-center">
-          <div class="flex flex-col items-center gap-1">
-            <Icon icon="lucide:scale" class="h-8 w-8 text-muted-foreground/30" />
-            <p class="text-sm text-muted-foreground">No weight entries yet</p>
+        <TableCell colspan="4" class="py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <Icon icon="lucide:scale" class="h-12 w-12 text-muted-foreground/25 animate-gentle-bob" />
+            <p class="text-sm font-medium text-foreground/70">No weight entries yet</p>
+            <p class="text-xs text-muted-foreground">Log your first weight to start tracking</p>
           </div>
         </TableCell>
       </TableRow>
-      <TableRow v-for="entry in recentEntries" :key="entry.id" class="transition-colors hover:bg-muted/50">
+      <TableRow v-for="entry in recentEntries" :key="entry.id" class="transition-colors duration-150 even:bg-muted/20 hover:bg-primary/5">
         <TableCell class="font-medium">{{ formatDateShort(entry.date) }}</TableCell>
         <TableCell>{{ format(entry.weightKg) }}</TableCell>
         <TableCell class="text-muted-foreground">{{ entry.note ?? '—' }}</TableCell>

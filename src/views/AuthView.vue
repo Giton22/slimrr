@@ -52,8 +52,8 @@ async function submit() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-background p-4">
-    <Card class="w-full max-w-sm">
+  <div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+    <Card class="w-full max-w-sm shadow-warm-lg">
       <CardHeader class="text-center">
         <div class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
           <Icon icon="lucide:scale" class="h-6 w-6 text-primary" />

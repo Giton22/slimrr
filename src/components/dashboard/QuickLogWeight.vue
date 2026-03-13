@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import { Icon } from '@iconify/vue'
 import { useWeightStore } from '@/stores/weight'
 import { useUnits } from '@/composables/useUnits'
+import { useNumericField } from '@/composables/useNumericField'
 import { todayISO } from '@/lib/date'
 import { useToday } from '@/composables/useToday'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,11 +21,11 @@ const todayEntry = computed(() =>
 
 const editing = ref(false)
 const saving = ref(false)
-const weightInput = ref<number | undefined>()
+const weightField = useNumericField({ min: 0, required: true })
 const inputRef = ref<InstanceType<typeof Input> | null>(null)
 
 function startEditing() {
-  weightInput.value = todayEntry.value ? convert(todayEntry.value.weightKg) : undefined
+  weightField.reset(todayEntry.value ? convert(todayEntry.value.weightKg) : undefined)
   editing.value = true
   nextTick(() => {
     const el = inputRef.value?.$el?.querySelector('input') ?? inputRef.value?.$el
@@ -33,17 +34,17 @@ function startEditing() {
 }
 
 async function save() {
-  if (!weightInput.value || saving.value) return
+  if (!weightField.validate() || saving.value) return
 
   saving.value = true
   try {
     await store.addEntry({
       date: todayISO(),
-      weightKg: toKg(weightInput.value),
+      weightKg: toKg(weightField.numericValue.value!),
     })
 
     editing.value = false
-    weightInput.value = undefined
+    weightField.reset()
   } catch {
     toast.error('Failed to save weight entry')
   } finally {
@@ -53,12 +54,12 @@ async function save() {
 
 function cancel() {
   editing.value = false
-  weightInput.value = undefined
+  weightField.reset()
 }
 </script>
 
 <template>
-  <Card>
+  <Card class="bg-primary/5 border-primary/20">
     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle class="text-sm font-medium text-muted-foreground">
         Today's Weight
@@ -71,7 +72,7 @@ function cancel() {
         </div>
         <button
           type="button"
-          class="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          class="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
           @click="startEditing"
         >
           <Icon :icon="todayEntry ? 'lucide:pencil' : 'lucide:plus'" class="h-3 w-3" />
@@ -79,22 +80,28 @@ function cancel() {
         </button>
       </template>
       <template v-else>
-        <form class="flex items-center gap-2" @submit.prevent="save">
-          <Input
-            ref="inputRef"
-            v-model.number="weightInput"
-            type="number"
-            step="0.1"
-            min="0"
-            :placeholder="isKg ? 'kg' : 'lbs'"
-            class="h-8 w-24"
-          />
-          <Button type="submit" size="sm" class="h-8" :disabled="!weightInput || saving">
+        <form class="flex flex-col gap-1" @submit.prevent="save">
+          <div class="flex items-center gap-2">
+            <Input
+              ref="inputRef"
+              v-model="weightField.displayValue.value"
+              type="text"
+              inputmode="decimal"
+              :placeholder="isKg ? 'kg' : 'lbs'"
+              class="h-8 w-24"
+              v-bind="weightField.inputAttrs.value"
+              :class="{ 'animate-shake': weightField.shaking.value }"
+            />
+            <Button type="submit" size="sm" class="h-8" :disabled="!weightField.numericValue.value || saving">
             <Icon :icon="saving ? 'lucide:loader-circle' : 'lucide:check'" class="h-4 w-4" :class="saving && 'animate-spin'" />
           </Button>
           <Button type="button" variant="ghost" size="sm" class="h-8" @click="cancel">
             <Icon icon="lucide:x" class="h-4 w-4" />
           </Button>
+          </div>
+          <p v-if="weightField.error.value" class="text-xs text-destructive">
+            {{ weightField.error.value }}
+          </p>
         </form>
       </template>
     </CardContent>

@@ -4,14 +4,16 @@ import { Icon } from '@iconify/vue'
 import { VisXYContainer, VisStackedBar, VisAxis, VisCrosshair, VisTooltip } from '@unovis/vue'
 import { useWeightStore } from '@/stores/weight'
 import { formatDateCompact } from '@/lib/date'
+import { getCalorieStatus } from '@/lib/calorieStatus'
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
 import type { ChartConfig } from '@/components/ui/chart'
 
 interface ChartDatum {
   date: number
   consumed: number
-  exceeded: boolean
+  goal: number
   hasConsumed: boolean
+  hasGoal: boolean
 }
 
 const store = useWeightStore()
@@ -32,9 +34,18 @@ const yConsumed = (d: ChartDatum) => d.hasConsumed ? d.consumed : 0
 
 const barColor = (d: ChartDatum) => {
   if (!d.hasConsumed) return 'var(--muted)'
-  if (d.exceeded) return 'var(--destructive)'
-  return 'var(--chart-2)'
+
+  const status = getCalorieStatus(
+    d.consumed,
+    d.hasGoal ? d.goal : null,
+    store.settings.goalDirection,
+  )
+
+  if (!status) return 'var(--chart-2)'
+  return status.chartColor
 }
+
+const tooltipIndicatorColor = (d: ChartDatum) => barColor(d)
 
 // Map index back to the date label of that data point
 const xTickFormat = (i: number) => {
@@ -57,8 +68,8 @@ const domainY = computed((): [number, number] => {
 
 <template>
   <div v-if="data.length === 0" class="flex h-[280px] flex-col items-center justify-center gap-2 text-center">
-    <Icon icon="lucide:bar-chart-3" class="h-10 w-10 text-muted-foreground/30" />
-    <p class="text-sm text-muted-foreground">No calorie data in this range</p>
+    <Icon icon="lucide:bar-chart-3" class="h-12 w-12 text-muted-foreground/25 animate-gentle-bob" />
+    <p class="text-sm font-medium text-foreground/70">No calorie data in this range</p>
     <p class="text-xs text-muted-foreground">Log your first calories to see your chart</p>
   </div>
   <ChartContainer v-else :config="chartConfig" class="h-[280px] w-full">
@@ -92,6 +103,7 @@ const domainY = computed((): [number, number] => {
             v-if="tooltipData"
             :config="chartConfig"
             :payload="{ consumed: tooltipData.consumed }"
+            :color="tooltipIndicatorColor(tooltipData)"
             :x="tooltipData.date"
             :label-formatter="formatDateCompact"
           />

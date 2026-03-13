@@ -43,6 +43,8 @@ watch(
         </Transition>
       </RouterView>
     </main>
-    <Toaster rich-colors close-button position="bottom-right" />
   </div>
+  <Teleport to="body">
+    <Toaster rich-colors close-button position="bottom-right" />
+  </Teleport>
 </template>

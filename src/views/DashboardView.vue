@@ -49,7 +49,7 @@ function goToSlide(index: number) {
     </Swiper>
 
     <!-- Fixed dot indicator — always visible at bottom of screen -->
-    <div class="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-2 pb-safe py-3 lg:hidden">
+    <div class="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-2 pb-safe py-3 lg:hidden bg-background/70 backdrop-blur-md border-t border-border/30">
       <button
         v-for="(_, i) in 2"
         :key="i"

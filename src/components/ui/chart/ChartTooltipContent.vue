@@ -29,7 +29,7 @@ const payload = computed(() => {
   return Object.entries(props.payload).map(([key, value]) => {
     // const key = `${props.nameKey || item.name || item.dataKey || "value"}`
     const itemConfig = props.config[key]
-    const indicatorColor = props.config[key]?.color ?? props.payload.fill
+    const indicatorColor = props.color ?? props.config[key]?.color ?? props.payload.fill
 
     return { key, value, itemConfig, indicatorColor }
   }).filter(i => i.itemConfig)

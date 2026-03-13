@@ -89,7 +89,7 @@ async function handleLeave() {
         </div>
 
         <!-- Invite code -->
-        <Card>
+        <Card class="shadow-warm">
           <CardContent class="flex items-center justify-between py-3">
             <div class="space-y-0.5">
               <p class="text-xs text-muted-foreground">Invite Code</p>

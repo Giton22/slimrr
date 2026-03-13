@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import { Icon } from '@iconify/vue'
 import { useWeightStore } from '@/stores/weight'
 import { useUnits } from '@/composables/useUnits'
+import { useNumericField } from '@/composables/useNumericField'
 import { todayISO } from '@/lib/date'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,7 +24,7 @@ const { isKg, convert, toKg } = useUnits()
 
 const open = ref(false)
 const date = ref(todayISO())
-const weight = ref<number | undefined>()
+const weightField = useNumericField({ min: 0, required: true })
 const note = ref('')
 const saving = ref(false)
 const weightInputRef = ref<InstanceType<typeof Input> | null>(null)
@@ -38,7 +39,7 @@ const isUpdating = computed(() => !!existingEntry.value)
 watch(date, (newDate) => {
   const existing = store.sortedEntries.find(e => e.date === newDate)
   if (existing) {
-    weight.value = Math.round(convert(existing.weightKg) * 10) / 10
+    weightField.reset(Math.round(convert(existing.weightKg) * 10) / 10)
     note.value = existing.note ?? ''
   }
 })
@@ -50,7 +51,7 @@ watch(open, (isOpen) => {
     // Pre-fill if today already has an entry
     const existing = store.sortedEntries.find(e => e.date === date.value)
     if (existing) {
-      weight.value = Math.round(convert(existing.weightKg) * 10) / 10
+      weightField.reset(Math.round(convert(existing.weightKg) * 10) / 10)
       note.value = existing.note ?? ''
     }
     nextTick(() => {
@@ -61,18 +62,18 @@ watch(open, (isOpen) => {
 })
 
 async function submit() {
-  if (!weight.value || !date.value || saving.value) return
+  if (!weightField.validate() || !date.value || saving.value) return
 
   saving.value = true
   try {
     await store.addEntry({
       date: date.value,
-      weightKg: toKg(weight.value),
+      weightKg: toKg(weightField.numericValue.value!),
       note: note.value || undefined,
     })
 
     // Reset
-    weight.value = undefined
+    weightField.reset()
     note.value = ''
     date.value = todayISO()
     open.value = false
@@ -94,7 +95,10 @@ async function submit() {
     </DialogTrigger>
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>Log Weight</DialogTitle>
+        <DialogTitle class="flex items-center gap-2">
+          <Icon icon="lucide:scale" class="h-5 w-5 text-primary" />
+          Log Weight
+        </DialogTitle>
         <DialogDescription>{{ isUpdating ? 'Update an existing weight entry.' : 'Add a new weight entry.' }}</DialogDescription>
       </DialogHeader>
       <form class="grid gap-4 py-4" @submit.prevent="submit">
@@ -110,19 +114,23 @@ async function submit() {
           <Input
             id="weight"
             ref="weightInputRef"
-            v-model.number="weight"
-            type="number"
-            step="0.1"
-            min="0"
+            v-model="weightField.displayValue.value"
+            type="text"
+            inputmode="decimal"
             placeholder="Enter weight"
+            v-bind="weightField.inputAttrs.value"
+            :class="{ 'animate-shake': weightField.shaking.value }"
           />
+          <p v-if="weightField.error.value" class="text-xs text-destructive">
+            {{ weightField.error.value }}
+          </p>
         </div>
         <div class="grid gap-2">
           <Label for="note">Note (optional)</Label>
           <Input id="note" v-model="note" placeholder="e.g. After workout" />
         </div>
         <DialogFooter>
-          <Button type="submit" :disabled="!weight || !date || saving">
+          <Button type="submit" :disabled="!weightField.numericValue.value || !date || saving">
             <Icon v-if="saving" icon="lucide:loader-circle" class="mr-2 h-4 w-4 animate-spin" />
             {{ isUpdating ? 'Update' : 'Save' }}
           </Button>

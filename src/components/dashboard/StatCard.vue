@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 defineProps<{
   title: string
   value: string
+  valueClass?: string
   description?: string
   trend?: 'up' | 'down' | 'neutral'
   trendValue?: string
@@ -12,14 +13,14 @@ defineProps<{
 </script>
 
 <template>
-  <Card>
+  <Card class="border-l-[3px] border-l-primary/40 transition-all duration-200 hover:shadow-warm-md hover:-translate-y-0.5">
     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle class="text-sm font-medium text-muted-foreground">
         {{ title }}
       </CardTitle>
     </CardHeader>
     <CardContent>
-      <div class="text-2xl font-bold">{{ value }}</div>
+      <div class="text-2xl font-bold" :class="valueClass">{{ value }}</div>
       <p v-if="description || trendValue" class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
         <template v-if="trendValue">
           <span

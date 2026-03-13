@@ -4,7 +4,9 @@ import { toast } from 'vue-sonner'
 import { Icon } from '@iconify/vue'
 import type { DailyCalorieRow } from '@/types'
 import { useWeightStore } from '@/stores/weight'
+import { useNumericField } from '@/composables/useNumericField'
 import { formatDateLong } from '@/lib/date'
+import { getCalorieStatus } from '@/lib/calorieStatus'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,20 +27,16 @@ const props = defineProps<{
 
 const store = useWeightStore()
 
-const consumedValue = ref<string | number>('')
-const overrideValue = ref<string | number>('')
+const consumedField = useNumericField({ min: 0, required: false, allowDecimals: false })
+const overrideField = useNumericField({ min: 1, required: false, allowDecimals: false })
 const saving = ref(false)
-
-function normalizeInput(value: string | number): string {
-  return String(value).trim()
-}
 
 watch(
   () => ({ isOpen: open.value, row: props.row }),
   ({ isOpen, row }) => {
     if (!isOpen || !row) return
-    consumedValue.value = row.consumedKcal !== null ? String(row.consumedKcal) : ''
-    overrideValue.value = row.goalSource === 'override' && row.goalKcal !== null ? String(row.goalKcal) : ''
+    consumedField.reset(row.consumedKcal !== null ? row.consumedKcal : undefined)
+    overrideField.reset(row.goalSource === 'override' && row.goalKcal !== null ? row.goalKcal : undefined)
   },
   { immediate: true },
 )
@@ -59,17 +57,11 @@ const resolvedGlobalGoal = computed(() => {
 })
 
 const statusPreview = computed(() => {
-  const consumedRaw = normalizeInput(consumedValue.value)
-  const overrideRaw = normalizeInput(overrideValue.value)
-  const consumed = consumedRaw === '' ? null : Number(consumedRaw)
-  const override = overrideRaw === '' ? null : Number(overrideRaw)
+  const consumed = consumedField.numericValue.value
+  const override = overrideField.numericValue.value
   const goal = override ?? resolvedGlobalGoal.value
 
-  if (consumed === null || Number.isNaN(consumed) || goal === null || Number.isNaN(goal)) return null
-  const delta = Math.round(consumed - goal)
-  if (delta > 0) return `+${delta} kcal over`
-  if (delta < 0) return `${Math.abs(delta)} kcal under`
-  return 'On target'
+  return getCalorieStatus(consumed ?? null, goal ?? null, store.settings.goalDirection)
 })
 
 function closeDialog() {
@@ -79,16 +71,12 @@ function closeDialog() {
 async function save() {
   if (!props.row || saving.value) return
 
-  const rawConsumed = normalizeInput(consumedValue.value)
-  const rawOverride = normalizeInput(overrideValue.value)
+  const consumedValid = consumedField.validate()
+  const overrideValid = overrideField.validate()
+  if (!consumedValid || !overrideValid) return
 
-  const calories = rawConsumed === '' ? null : Number(rawConsumed)
-  const goalOverrideKcal = rawOverride === '' ? null : Number(rawOverride)
-
-  if ((calories !== null && (Number.isNaN(calories) || calories < 0))
-    || (goalOverrideKcal !== null && (Number.isNaN(goalOverrideKcal) || goalOverrideKcal <= 0))) {
-    return
-  }
+  const calories = consumedField.numericValue.value ?? null
+  const goalOverrideKcal = overrideField.numericValue.value ?? null
 
   saving.value = true
   try {
@@ -107,7 +95,7 @@ async function save() {
 }
 
 function resetOverride() {
-  overrideValue.value = ''
+  overrideField.reset()
 }
 </script>
 
@@ -133,12 +121,16 @@ function resetOverride() {
           <Label for="day-consumed">Consumed kcal</Label>
           <Input
             id="day-consumed"
-            v-model="consumedValue"
-            type="number"
-            min="0"
-            step="1"
+            v-model="consumedField.displayValue.value"
+            type="text"
+            inputmode="numeric"
             placeholder="Leave empty if not logged"
+            v-bind="consumedField.inputAttrs.value"
+            :class="{ 'animate-shake': consumedField.shaking.value }"
           />
+          <p v-if="consumedField.error.value" class="text-xs text-destructive">
+            {{ consumedField.error.value }}
+          </p>
         </div>
 
         <div class="grid gap-2">
@@ -157,12 +149,16 @@ function resetOverride() {
           </div>
           <Input
             id="day-override"
-            v-model="overrideValue"
-            type="number"
-            min="0"
-            step="1"
+            v-model="overrideField.displayValue.value"
+            type="text"
+            inputmode="numeric"
             placeholder="Leave empty to use the global goal"
+            v-bind="overrideField.inputAttrs.value"
+            :class="{ 'animate-shake': overrideField.shaking.value }"
           />
+          <p v-if="overrideField.error.value" class="text-xs text-destructive">
+            {{ overrideField.error.value }}
+          </p>
           <p class="text-xs text-muted-foreground">
             This field creates a custom goal only for this date.
           </p>
@@ -170,7 +166,7 @@ function resetOverride() {
 
         <div v-if="statusPreview" class="rounded-lg border border-border bg-background p-3 text-sm">
           <span class="text-muted-foreground">Preview:</span>
-          <span class="ml-2 font-medium">{{ statusPreview }}</span>
+          <span class="ml-2 font-medium" :class="statusPreview.textClass">{{ statusPreview.label }}</span>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import type { WeightEntry } from '@/types'
 import { useWeightStore } from '@/stores/weight'
 import { useUnits } from '@/composables/useUnits'
+import { useNumericField } from '@/composables/useNumericField'
 import { formatDateLong } from '@/lib/date'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +28,7 @@ const props = defineProps<{
 const store = useWeightStore()
 const { isKg, convert, toKg } = useUnits()
 
-const weightValue = ref<number | undefined>()
+const weightField = useNumericField({ min: 0, required: true })
 const noteValue = ref('')
 const saving = ref(false)
 const weightInputRef = ref<InstanceType<typeof Input> | null>(null)
@@ -36,7 +37,7 @@ watch(
   () => ({ isOpen: open.value, entry: props.entry }),
   ({ isOpen, entry }) => {
     if (!isOpen || !entry) return
-    weightValue.value = Math.round(convert(entry.weightKg) * 10) / 10
+    weightField.reset(Math.round(convert(entry.weightKg) * 10) / 10)
     noteValue.value = entry.note ?? ''
   },
   { immediate: true },
@@ -47,12 +48,12 @@ function closeDialog() {
 }
 
 async function save() {
-  if (!props.entry || !weightValue.value || saving.value) return
+  if (!props.entry || !weightField.validate() || saving.value) return
 
   saving.value = true
   try {
     await store.updateEntry(props.entry.id, {
-      weightKg: toKg(weightValue.value),
+      weightKg: toKg(weightField.numericValue.value!),
       note: noteValue.value || undefined,
     })
 
@@ -81,12 +82,16 @@ async function save() {
           <Input
             id="edit-weight"
             ref="weightInputRef"
-            v-model.number="weightValue"
-            type="number"
-            step="0.1"
-            min="0"
+            v-model="weightField.displayValue.value"
+            type="text"
+            inputmode="decimal"
             placeholder="Enter weight"
+            v-bind="weightField.inputAttrs.value"
+            :class="{ 'animate-shake': weightField.shaking.value }"
           />
+          <p v-if="weightField.error.value" class="text-xs text-destructive">
+            {{ weightField.error.value }}
+          </p>
         </div>
         <div class="grid gap-2">
           <Label for="edit-note">Note (optional)</Label>
@@ -94,7 +99,7 @@ async function save() {
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" @click="closeDialog">Cancel</Button>
-          <Button type="submit" :disabled="!weightValue || saving">
+          <Button type="submit" :disabled="!weightField.numericValue.value || saving">
             <Icon v-if="saving" icon="lucide:loader-circle" class="mr-2 h-4 w-4 animate-spin" />
             Save
           </Button>

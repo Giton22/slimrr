@@ -38,18 +38,22 @@ const goalDescription = computed(() => {
   <div class="space-y-6">
     <!-- Weight Stat Cards -->
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      <QuickLogWeight class="col-span-2 xl:col-span-1" />
+      <QuickLogWeight class="col-span-2 xl:col-span-1 animate-card-enter" style="animation-delay: 0ms" />
       <StatCard
+        class="animate-card-enter" style="animation-delay: 50ms"
         title="Goal Weight"
         :value="format(store.settings.goalWeightKg)"
         :description="goalDescription"
       />
       <StatCard
+        class="animate-card-enter" style="animation-delay: 100ms"
         title="BMI"
         :value="store.bmi !== null ? String(store.bmi) : '—'"
+        :value-class="store.bmiCategory?.textColorClass"
         :description="store.bmiCategory?.shortLabel ?? ''"
       />
       <StatCard
+        class="animate-card-enter" style="animation-delay: 150ms"
         title="7-Day Trend"
         :value="store.weightTrend !== null ? formatDelta(store.weightTrend) : '—'"
         :trend="store.weightTrend !== null ? (store.weightTrend < 0 ? 'down' : store.weightTrend > 0 ? 'up' : 'neutral') : undefined"
@@ -57,11 +61,13 @@ const goalDescription = computed(() => {
         description="vs previous 7 days"
       />
       <StatCard
+        class="animate-card-enter" style="animation-delay: 200ms"
         title="Weekly Average"
         :value="store.weeklyAverage !== null ? format(store.weeklyAverage.avg) : '—'"
         :description="store.weeklyAverage !== null ? `This week (${store.weeklyAverage.count} entries)` : 'No entries this week'"
       />
       <StatCard
+        class="animate-card-enter" style="animation-delay: 250ms"
         title="Monthly Average"
         :value="store.monthlyAverage !== null ? format(store.monthlyAverage.avg) : '—'"
         :description="store.monthlyAverage !== null ? `This month (${store.monthlyAverage.count} entries)` : 'No entries this month'"
@@ -69,7 +75,7 @@ const goalDescription = computed(() => {
     </div>
 
     <!-- Weight Chart -->
-    <Card>
+    <Card class="animate-card-enter" style="animation-delay: 300ms">
       <CardHeader class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Weight History</CardTitle>
         <div class="flex flex-wrap items-center gap-2">
@@ -84,7 +90,7 @@ const goalDescription = computed(() => {
     </Card>
 
     <!-- Recent Weight Entries -->
-    <Card>
+    <Card class="animate-card-enter" style="animation-delay: 350ms">
       <CardHeader>
         <CardTitle>Recent Entries</CardTitle>
       </CardHeader>

@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 
 import App from './App.vue'
+import 'vue-sonner/style.css'
 import './assets/index.css'
 import router from './router'
 

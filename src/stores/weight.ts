@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 import type { CalorieEntry, DailyCalorieRow, GoalDirection, KcalGoalChange, Sex, TimeRange, UserSettings, WeightEntry } from '@/types'
 import { pb, COLLECTIONS } from '@/lib/pocketbase'
-import type { WeightEntryRecord, CalorieEntryRecord, KcalGoalChangeRecord, UserSettingsRecord } from '@/lib/pocketbase'
+import type { WeightEntryRecord, CalorieEntryRecord, KcalGoalChangeRecord, UserSettingsRecord, GoalRecord } from '@/lib/pocketbase'
 import { todayISO } from '@/lib/date'
 import { today } from '@/composables/useToday'
 import { getBmiCategory } from '@/composables/useBmi'
@@ -637,6 +637,31 @@ export const useWeightStore = defineStore('weight', () => {
     calorieEntries.value = calorieEntries.value.filter(e => e.date !== date)
   }
 
+  async function resetUserData() {
+    const userId = pb.authStore.record?.id
+    if (!userId) return
+
+    const userFilter = pb.filter('user = {:userId}', { userId })
+
+    const [weightRecords, calorieRecords, kcalGoalRecords, goalRecords] = await Promise.all([
+      pb.collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES).getFullList({ filter: userFilter }),
+      pb.collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES).getFullList({ filter: userFilter }),
+      pb.collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY).getFullList({ filter: userFilter }),
+      pb.collection<GoalRecord>(COLLECTIONS.GOALS).getFullList({ filter: userFilter }),
+    ])
+
+    await Promise.all([
+      ...weightRecords.map(record => pb.collection(COLLECTIONS.WEIGHT_ENTRIES).delete(record.id)),
+      ...calorieRecords.map(record => pb.collection(COLLECTIONS.CALORIE_ENTRIES).delete(record.id)),
+      ...kcalGoalRecords.map(record => pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).delete(record.id)),
+      ...goalRecords.map(record => pb.collection(COLLECTIONS.GOALS).delete(record.id)),
+    ])
+
+    entries.value = []
+    calorieEntries.value = []
+    kcalGoalHistory.value = []
+  }
+
   return {
     // Weight
     entries,
@@ -681,6 +706,7 @@ export const useWeightStore = defineStore('weight', () => {
     setDayGoalOverride,
     saveDailyCalories,
     deleteCalorieEntry,
+    resetUserData,
     settingsRecordId,
     // Lifecycle
     loadAll,

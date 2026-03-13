@@ -57,8 +57,8 @@ const domainY = computed((): [number, number] => {
 
 <template>
   <div v-if="data.length === 0" class="flex h-[280px] flex-col items-center justify-center gap-2 text-center">
-    <Icon icon="lucide:line-chart" class="h-10 w-10 text-muted-foreground/30" />
-    <p class="text-sm text-muted-foreground">No weight data in this range</p>
+    <Icon icon="lucide:line-chart" class="h-12 w-12 text-muted-foreground/25 animate-gentle-bob" />
+    <p class="text-sm font-medium text-foreground/70">No weight data in this range</p>
     <p class="text-xs text-muted-foreground">Log your first weight to see your chart</p>
   </div>
   <ChartContainer v-else :config="chartConfig" class="h-[280px] w-full">

@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWeightStore } from '@/stores/weight'
 import { lbsToKg } from '@/composables/useUnits'
+import { useNumericField } from '@/composables/useNumericField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -34,18 +35,17 @@ const accountError = ref<string | null>(null)
 
 // ── Step 3: Profile fields ──
 const unit = ref<'kg' | 'lbs'>('kg')
-const heightCm = ref('')
-const goalWeightInput = ref('')
+const heightField = useNumericField({ min: 50, max: 300, required: false })
+const goalWeightField = useNumericField({ min: 20, max: 500, required: false })
 const dateOfBirth = ref('')
 const sex = ref('')
 
 const isLoading = ref(false)
 
 // Convert display weight to kg for storage
-function displayToKg(val: string): number | undefined {
-  const n = Number.parseFloat(val)
-  if (Number.isNaN(n) || n <= 0) return undefined
-  return unit.value === 'kg' ? n : lbsToKg(n)
+function displayToKg(val: number): number | undefined {
+  if (val <= 0) return undefined
+  return unit.value === 'kg' ? val : lbsToKg(val)
 }
 
 // ── Step validation ──
@@ -86,11 +86,13 @@ async function finish() {
     await weightStore.loadAll()
 
     // 3. Persist all profile settings collected in step 3
-    const heightParsed = Number.parseFloat(heightCm.value)
-    const goalKg = displayToKg(goalWeightInput.value)
+    const heightParsed = heightField.numericValue.value
+    const goalKg = goalWeightField.numericValue.value
+      ? displayToKg(goalWeightField.numericValue.value)
+      : undefined
     await weightStore.persistSettings({
       unit: unit.value,
-      heightCm: !Number.isNaN(heightParsed) && heightParsed > 0 ? heightParsed : undefined,
+      heightCm: heightParsed && heightParsed > 0 ? heightParsed : undefined,
       goalWeightKg: goalKg,
       dateOfBirth: dateOfBirth.value || undefined,
       sex: (sex.value as 'male' | 'female') || undefined,
@@ -118,7 +120,7 @@ function goToDashboard() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-background p-4">
+  <div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
     <div class="w-full max-w-md">
 
       <!-- Progress bar (steps 1–3) -->
@@ -136,7 +138,7 @@ function goToDashboard() {
       </div>
 
       <!-- ── Step 1: Welcome ── -->
-      <Card v-if="step === 1">
+      <Card v-if="step === 1" class="shadow-warm-lg">
         <CardHeader class="text-center">
           <div class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
             <Icon icon="lucide:scale" class="h-7 w-7 text-primary" />
@@ -168,7 +170,7 @@ function goToDashboard() {
       </Card>
 
       <!-- ── Step 2: Account ── -->
-      <Card v-else-if="step === 2">
+      <Card v-else-if="step === 2" class="shadow-warm-lg">
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Icon icon="lucide:lock" class="h-5 w-5 text-primary" />
@@ -239,7 +241,7 @@ function goToDashboard() {
       </Card>
 
       <!-- ── Step 3: Profile ── -->
-      <Card v-else-if="step === 3">
+      <Card v-else-if="step === 3" class="shadow-warm-lg">
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Icon icon="lucide:user" class="h-5 w-5 text-primary" />
@@ -280,16 +282,19 @@ function goToDashboard() {
               <div class="flex items-center gap-2">
                 <Input
                   id="setup-height"
-                  v-model="heightCm"
-                  type="number"
-                  min="50"
-                  max="300"
-                  step="0.1"
+                  v-model="heightField.displayValue.value"
+                  type="text"
+                  inputmode="decimal"
                   placeholder="e.g. 178"
                   class="max-w-[160px]"
+                  v-bind="heightField.inputAttrs.value"
+                  :class="{ 'animate-shake': heightField.shaking.value }"
                 />
                 <span class="text-sm text-muted-foreground">cm</span>
               </div>
+              <p v-if="heightField.error.value" class="text-xs text-destructive">
+                {{ heightField.error.value }}
+              </p>
               <p class="text-xs text-muted-foreground">Always stored in centimetres.</p>
             </div>
 
@@ -299,16 +304,19 @@ function goToDashboard() {
               <div class="flex items-center gap-2">
                 <Input
                   id="setup-goal"
-                  v-model="goalWeightInput"
-                  type="number"
-                  min="20"
-                  max="500"
-                  step="0.1"
+                  v-model="goalWeightField.displayValue.value"
+                  type="text"
+                  inputmode="decimal"
                   :placeholder="unit === 'kg' ? 'e.g. 75' : 'e.g. 165'"
                   class="max-w-[160px]"
+                  v-bind="goalWeightField.inputAttrs.value"
+                  :class="{ 'animate-shake': goalWeightField.shaking.value }"
                 />
                 <span class="text-sm text-muted-foreground">{{ unit }}</span>
               </div>
+              <p v-if="goalWeightField.error.value" class="text-xs text-destructive">
+                {{ goalWeightField.error.value }}
+              </p>
             </div>
 
             <!-- Date of Birth -->
@@ -356,7 +364,7 @@ function goToDashboard() {
       </Card>
 
       <!-- ── Step 4: Done ── -->
-      <Card v-else-if="step === 4">
+      <Card v-else-if="step === 4" class="shadow-warm-lg">
         <CardHeader class="text-center">
           <div class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
             <Icon icon="lucide:circle-check" class="h-7 w-7 text-success" />

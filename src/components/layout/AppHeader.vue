@@ -23,15 +23,15 @@ function logout() {
 </script>
 
 <template>
-  <header class="border-b bg-background">
+  <header class="border-b border-border/60 bg-background/95 backdrop-blur-sm">
     <div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
       <RouterLink to="/" class="flex items-center gap-2 cursor-pointer">
         <Icon icon="lucide:scale" class="h-6 w-6 text-primary" />
-        <h1 class="text-lg font-semibold">Bodyweight Tracker</h1>
+        <h1 class="text-lg font-semibold text-primary">Bodyweight Tracker</h1>
       </RouterLink>
       <nav v-if="auth.isAuthenticated" class="ml-6 hidden sm:flex items-center gap-4">
-        <RouterLink to="/" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Dashboard</RouterLink>
-        <RouterLink to="/groups" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Groups</RouterLink>
+        <RouterLink to="/" class="nav-link text-sm text-muted-foreground hover:text-foreground transition-colors relative">Dashboard</RouterLink>
+        <RouterLink to="/groups" class="nav-link text-sm text-muted-foreground hover:text-foreground transition-colors relative">Groups</RouterLink>
       </nav>
       <div class="flex items-center gap-2 ml-auto">
         <ModeToggle />
@@ -72,3 +72,20 @@ function logout() {
     </div>
   </header>
 </template>
+
+<style scoped>
+.nav-link.router-link-exact-active {
+  color: var(--primary);
+  font-weight: 500;
+}
+.nav-link.router-link-exact-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+}
+</style>
