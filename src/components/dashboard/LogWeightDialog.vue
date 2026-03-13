@@ -101,7 +101,7 @@ async function submit() {
         <div class="grid gap-2">
           <Label for="date">Date</Label>
           <Input id="date" v-model="date" type="date" />
-          <p v-if="isUpdating" class="text-xs text-amber-500">
+          <p v-if="isUpdating" class="text-xs text-warning">
             Updating existing entry
           </p>
         </div>

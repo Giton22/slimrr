@@ -24,7 +24,7 @@ defineProps<{
         <template v-if="trendValue">
           <span
             class="inline-flex items-center gap-0.5"
-            :class="trend === 'down' ? 'text-green-600 dark:text-green-400' : trend === 'up' ? 'text-red-600 dark:text-red-400' : ''"
+            :class="trend === 'down' ? 'text-success' : trend === 'up' ? 'text-destructive' : ''"
             :aria-label="`Trend: ${trendValue}`"
           >
             <Icon

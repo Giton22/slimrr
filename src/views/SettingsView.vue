@@ -164,7 +164,7 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+  <div class="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
     <!-- Back button -->
     <div class="mb-6 flex items-center gap-2">
       <Button variant="ghost" size="icon" @click="router.push('/')">
@@ -355,7 +355,7 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
                 {{ isSaving ? 'Saving...' : 'Save Settings' }}
               </Button>
               <Transition name="fade">
-                <span v-if="saveSuccess" class="flex items-center gap-1 text-sm text-green-600">
+                <span v-if="saveSuccess" class="flex items-center gap-1 text-sm text-success">
                   <Icon icon="lucide:check" class="h-4 w-4" />
                   Saved
                 </span>
@@ -450,7 +450,7 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
                 v-if="weightDifferenceText"
                 class="flex items-start gap-2 rounded-lg p-3"
                 :class="store.weightToHealthyBmi === 0
-                  ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                  ? 'bg-success/10 text-success'
                   : 'bg-muted'"
               >
                 <Icon
@@ -460,7 +460,7 @@ const weightUnitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
                       ? 'lucide:trending-down'
                       : 'lucide:trending-up'"
                   class="mt-0.5 h-4 w-4 shrink-0"
-                  :class="store.weightToHealthyBmi === 0 ? 'text-green-600' : 'text-muted-foreground'"
+                  :class="store.weightToHealthyBmi === 0 ? 'text-success' : 'text-muted-foreground'"
                 />
                 <span class="text-sm">{{ weightDifferenceText }}</span>
               </div>

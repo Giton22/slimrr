@@ -5,15 +5,17 @@ import { Icon } from '@iconify/vue'
 import { useWeightStore } from '@/stores/weight'
 import { useUnits } from '@/composables/useUnits'
 import { todayISO } from '@/lib/date'
+import { useToday } from '@/composables/useToday'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 const store = useWeightStore()
 const { convert, isKg, format, toKg } = useUnits()
+const todayRef = useToday()
 
 const todayEntry = computed(() =>
-  store.sortedEntries.find(e => e.date === todayISO()),
+  store.sortedEntries.find(e => e.date === todayRef.value),
 )
 
 const editing = ref(false)

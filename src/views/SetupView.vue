@@ -358,8 +358,8 @@ function goToDashboard() {
       <!-- ── Step 4: Done ── -->
       <Card v-else-if="step === 4">
         <CardHeader class="text-center">
-          <div class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10">
-            <Icon icon="lucide:circle-check" class="h-7 w-7 text-green-600" />
+          <div class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
+            <Icon icon="lucide:circle-check" class="h-7 w-7 text-success" />
           </div>
           <CardTitle class="text-2xl">You're all set!</CardTitle>
           <CardDescription class="text-base">

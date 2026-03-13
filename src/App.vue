@@ -5,6 +5,10 @@ import AppHeader from '@/components/layout/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWeightStore } from '@/stores/weight'
 import { useGroupsStore } from '@/stores/groups'
+import { useToday } from '@/composables/useToday'
+
+// Start the midnight-check timer so the reactive `today` ref stays current
+useToday()
 
 const auth = useAuthStore()
 const weightStore = useWeightStore()

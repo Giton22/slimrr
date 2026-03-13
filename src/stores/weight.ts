@@ -5,6 +5,7 @@ import type { CalorieEntry, DailyCalorieRow, GoalDirection, KcalGoalChange, Sex,
 import { pb, COLLECTIONS } from '@/lib/pocketbase'
 import type { WeightEntryRecord, CalorieEntryRecord, KcalGoalChangeRecord, UserSettingsRecord } from '@/lib/pocketbase'
 import { todayISO } from '@/lib/date'
+import { today } from '@/composables/useToday'
 import { getBmiCategory } from '@/composables/useBmi'
 import { useGroupsStore } from '@/stores/groups'
 
@@ -106,13 +107,17 @@ export const useWeightStore = defineStore('weight', () => {
       const userId = pb.authStore.record?.id
       if (!userId) return
 
-      const filter = pb.filter('user = {:userId}', { userId })
+      const userFilter = pb.filter('user = {:userId}', { userId })
+      const dateBoundFilter = pb.filter(
+        'user = {:userId} && date >= {:cutoff}',
+        { userId, cutoff: cutoffISO(365) },
+      )
 
       const [weightRecords, calorieRecords, kcalGoalRecords, settingsRecords] = await Promise.all([
-        pb.collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES).getFullList({ filter, sort: 'date' }),
-        pb.collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES).getFullList({ filter, sort: 'date' }),
-        pb.collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY).getFullList({ filter, sort: 'effective_from' }),
-        pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).getFullList({ filter }),
+        pb.collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES).getFullList({ filter: dateBoundFilter, sort: 'date' }),
+        pb.collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES).getFullList({ filter: dateBoundFilter, sort: 'date' }),
+        pb.collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY).getFullList({ filter: userFilter, sort: 'effective_from' }),
+        pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).getFullList({ filter: userFilter }),
       ])
 
       entries.value = weightRecords.map(toWeightEntry)
@@ -342,7 +347,7 @@ export const useWeightStore = defineStore('weight', () => {
   })
 
   const weeklyAverage = computed<{ avg: number; count: number } | null>(() => {
-    const currentWeekKey = getISOWeekKey(todayISO())
+    const currentWeekKey = getISOWeekKey(today.value)
     const weekEntries = sortedEntries.value.filter(e => getISOWeekKey(e.date) === currentWeekKey)
     if (weekEntries.length === 0) return null
     const avg = weekEntries.reduce((s, e) => s + e.weightKg, 0) / weekEntries.length
@@ -350,7 +355,7 @@ export const useWeightStore = defineStore('weight', () => {
   })
 
   const monthlyAverage = computed<{ avg: number; count: number } | null>(() => {
-    const currentMonthKey = todayISO().slice(0, 7)
+    const currentMonthKey = today.value.slice(0, 7)
     const monthEntries = sortedEntries.value.filter(e => e.date.slice(0, 7) === currentMonthKey)
     if (monthEntries.length === 0) return null
     const avg = monthEntries.reduce((s, e) => s + e.weightKg, 0) / monthEntries.length
@@ -371,8 +376,7 @@ export const useWeightStore = defineStore('weight', () => {
   )
 
   const currentGlobalKcalGoal = computed<number | null>(() => {
-    const today = todayISO()
-    return getGlobalKcalGoalForDate(today)
+    return getGlobalKcalGoalForDate(today.value)
   })
 
   function getGlobalKcalGoalForDate(date: string): number | null {
@@ -451,13 +455,12 @@ export const useWeightStore = defineStore('weight', () => {
   // ── Kcal summary stats ──
 
   const todayCalorieSummary = computed(() => {
-    const today = todayISO()
-    const row = dailyCalorieRows.value.find(r => r.date === today)
+    const row = dailyCalorieRows.value.find(r => r.date === today.value)
     return row ?? null
   })
 
   const weeklyCalorieAverage = computed<number | null>(() => {
-    const currentWeekKey = getISOWeekKey(todayISO())
+    const currentWeekKey = getISOWeekKey(today.value)
     const weekRows = dailyCalorieRows.value.filter(
       r => r.consumedKcal !== null && getISOWeekKey(r.date) === currentWeekKey,
     )

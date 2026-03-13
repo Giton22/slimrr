@@ -42,6 +42,8 @@ const xTickFormat = (i: number) => {
 
 const numTicks = computed(() => Math.min(data.value.length, 12))
 
+const chartMargin = { top: 10, right: 10, bottom: 30, left: 45 }
+
 const unitLabel = computed(() => isKg.value ? 'kg' : 'lbs')
 
 const domainY = computed((): [number, number] => {
@@ -60,7 +62,7 @@ const domainY = computed((): [number, number] => {
     <p class="text-xs text-muted-foreground">Log your first weight to see your chart</p>
   </div>
   <ChartContainer v-else :config="chartConfig" class="h-[280px] w-full">
-    <VisXYContainer :data="data" :margin="{ top: 10, right: 10, bottom: 30, left: 45 }" :domain-y="domainY">
+    <VisXYContainer :data="data" :margin="chartMargin" :domain-y="domainY">
       <VisLine
         :x="x"
         :y="y"

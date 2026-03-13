@@ -42,6 +42,9 @@ const xTickFormat = (i: number) => {
   return d ? formatDateCompact(d.date) : ''
 }
 
+const chartMargin = { top: 10, right: 10, bottom: 30, left: 55 }
+const yAccessors = [yConsumed]
+
 const numTicks = computed(() => Math.min(data.value.length, 12))
 
 const domainY = computed((): [number, number] => {
@@ -59,10 +62,10 @@ const domainY = computed((): [number, number] => {
     <p class="text-xs text-muted-foreground">Log your first calories to see your chart</p>
   </div>
   <ChartContainer v-else :config="chartConfig" class="h-[280px] w-full">
-    <VisXYContainer :data="data" :margin="{ top: 10, right: 10, bottom: 30, left: 55 }" :domain-y="domainY">
+    <VisXYContainer :data="data" :margin="chartMargin" :domain-y="domainY">
       <VisStackedBar
         :x="x"
-        :y="[yConsumed]"
+        :y="yAccessors"
         :color="barColor"
         :bar-padding="0.3"
         :rounded-corners="4"

@@ -78,7 +78,7 @@ async function executeDelete() {
           </div>
         </TableCell>
       </TableRow>
-      <TableRow v-for="entry in recentEntries" :key="entry.id">
+      <TableRow v-for="entry in recentEntries" :key="entry.id" class="transition-colors hover:bg-muted/50">
         <TableCell class="font-medium">{{ formatDateShort(entry.date) }}</TableCell>
         <TableCell>{{ format(entry.weightKg) }}</TableCell>
         <TableCell class="text-muted-foreground">{{ entry.note ?? '—' }}</TableCell>

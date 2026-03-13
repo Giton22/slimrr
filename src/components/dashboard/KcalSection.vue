@@ -21,7 +21,7 @@ const todayKcalRemaining = computed(() => {
 <template>
   <div class="space-y-6">
     <!-- Kcal Stat Cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <StatCard
         title="Today's Intake"
         :value="store.todayCalorieSummary?.consumedKcal !== null && store.todayCalorieSummary?.consumedKcal !== undefined ? `${store.todayCalorieSummary.consumedKcal} kcal` : '—'"
@@ -58,9 +58,8 @@ const todayKcalRemaining = computed(() => {
 
     <!-- Daily Calories Table -->
     <Card>
-      <CardHeader class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <CardHeader>
         <CardTitle>Daily Calories</CardTitle>
-        <SetKcalGoalDialog />
       </CardHeader>
       <CardContent>
         <DailyCaloriesTable />

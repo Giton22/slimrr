@@ -37,8 +37,8 @@ const goalDescription = computed(() => {
 <template>
   <div class="space-y-6">
     <!-- Weight Stat Cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <QuickLogWeight />
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <QuickLogWeight class="col-span-2 xl:col-span-1" />
       <StatCard
         title="Goal Weight"
         :value="format(store.settings.goalWeightKg)"
