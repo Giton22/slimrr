@@ -33,6 +33,14 @@ const todayKcalStatusLine = computed(() => {
   if (todayKcalStatus.value.side === 'target') return 'On target'
   return `${todayKcalStatus.value.label} kcal`
 })
+
+const filteredCalorieCount = computed(() => store.dailyCalorieRows.length)
+const totalCalorieCount = computed(() => store.calorieEntries.length)
+
+const caloriesCountHint = computed(() => {
+  if (totalCalorieCount.value === 0) return ''
+  return `Showing ${filteredCalorieCount.value} of ${totalCalorieCount.value} days`
+})
 </script>
 
 <template>
@@ -92,7 +100,12 @@ const todayKcalStatusLine = computed(() => {
     <!-- Daily Calories Table -->
     <Card class="animate-card-enter" style="animation-delay: 200ms">
       <CardHeader>
-        <CardTitle>Daily Calories</CardTitle>
+        <div class="flex flex-wrap items-end justify-between gap-2">
+          <CardTitle>Daily Calories</CardTitle>
+          <p v-if="caloriesCountHint" class="text-xs text-muted-foreground">
+            {{ caloriesCountHint }}
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <DailyCaloriesTable />

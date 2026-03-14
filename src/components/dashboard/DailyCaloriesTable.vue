@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { DailyCalorieRow } from '@/types'
 import { useWeightStore } from '@/stores/weight'
@@ -20,8 +20,69 @@ const store = useWeightStore()
 
 const selectedRow = ref<DailyCalorieRow | null>(null)
 const dialogOpen = ref(false)
+const scrollContainerRef = ref<HTMLElement | null>(null)
+const scrollTop = ref(0)
+const containerHeight = ref(500)
 
-const rows = computed(() => store.dailyCalorieRows)
+const rows = computed(() => [...store.dailyCalorieRows].reverse())
+
+const ROW_HEIGHT = 52
+const OVERSCAN = 8
+const VIRTUALIZATION_THRESHOLD = 120
+
+const useVirtualRows = computed(() => rows.value.length > VIRTUALIZATION_THRESHOLD)
+
+const visibleCount = computed(() => {
+  if (!useVirtualRows.value) return rows.value.length
+  return Math.ceil(containerHeight.value / ROW_HEIGHT) + OVERSCAN * 2
+})
+
+const startIndex = computed(() => {
+  if (!useVirtualRows.value) return 0
+  const firstVisibleIndex = Math.floor(scrollTop.value / ROW_HEIGHT)
+  return Math.max(0, firstVisibleIndex - OVERSCAN)
+})
+
+const endIndex = computed(() => {
+  if (!useVirtualRows.value) return rows.value.length
+  return Math.min(rows.value.length, startIndex.value + visibleCount.value)
+})
+
+const visibleRows = computed(() => {
+  if (!useVirtualRows.value) return rows.value
+  return rows.value.slice(startIndex.value, endIndex.value)
+})
+
+const topSpacerHeight = computed(() => {
+  if (!useVirtualRows.value) return 0
+  return startIndex.value * ROW_HEIGHT
+})
+
+const bottomSpacerHeight = computed(() => {
+  if (!useVirtualRows.value) return 0
+  return Math.max(0, (rows.value.length - endIndex.value) * ROW_HEIGHT)
+})
+
+function measureContainer() {
+  const el = scrollContainerRef.value
+  if (!el) return
+  containerHeight.value = el.clientHeight
+}
+
+function onScroll() {
+  const el = scrollContainerRef.value
+  if (!el) return
+  scrollTop.value = el.scrollTop
+}
+
+onMounted(() => {
+  measureContainer()
+  window.addEventListener('resize', measureContainer)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureContainer)
+})
 
 function getStatus(row: DailyCalorieRow) {
   return getCalorieStatus(row.consumedKcal, row.goalKcal, store.settings.goalDirection)
@@ -58,7 +119,11 @@ function openRow(row: DailyCalorieRow) {
 
 <template>
   <div class="space-y-3">
-    <div class="max-h-[500px] overflow-auto rounded-lg border border-border">
+    <div
+      ref="scrollContainerRef"
+      class="max-h-[500px] overflow-auto rounded-lg border border-border"
+      @scroll="onScroll"
+    >
       <Table>
         <TableHeader>
           <TableRow>
@@ -82,8 +147,14 @@ function openRow(row: DailyCalorieRow) {
               </div>
             </TableCell>
           </TableRow>
+          <TableRow v-else-if="topSpacerHeight > 0" aria-hidden="true">
+            <TableCell
+              :style="{ height: `${topSpacerHeight}px`, padding: 0, border: 'none' }"
+              colspan="5"
+            />
+          </TableRow>
           <TableRow
-            v-for="row in rows"
+            v-for="row in visibleRows"
             :key="row.date"
             class="cursor-pointer transition-colors duration-150 even:bg-muted/20 hover:bg-primary/5"
             :class="getRowHighlightClass(row)"
@@ -126,6 +197,12 @@ function openRow(row: DailyCalorieRow) {
                 <Icon icon="lucide:pencil" class="h-4 w-4" />
               </button>
             </TableCell>
+          </TableRow>
+          <TableRow v-if="rows.length > 0 && bottomSpacerHeight > 0" aria-hidden="true">
+            <TableCell
+              :style="{ height: `${bottomSpacerHeight}px`, padding: 0, border: 'none' }"
+              colspan="5"
+            />
           </TableRow>
         </TableBody>
       </Table>

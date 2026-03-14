@@ -32,6 +32,14 @@ const goalDescription = computed(() => {
   if (goalRemaining.value === 0) return 'Goal reached!'
   return `${formatDelta(goalRemaining.value)} remaining`
 })
+
+const filteredEntryCount = computed(() => store.filteredEntries.length)
+const totalEntryCount = computed(() => store.sortedEntries.length)
+
+const entriesCountHint = computed(() => {
+  if (totalEntryCount.value === 0) return ''
+  return `Showing ${filteredEntryCount.value} of ${totalEntryCount.value} entries`
+})
 </script>
 
 <template>
@@ -118,7 +126,12 @@ const goalDescription = computed(() => {
     <!-- Recent Weight Entries -->
     <Card class="animate-card-enter" style="animation-delay: 350ms">
       <CardHeader>
-        <CardTitle>Recent Entries</CardTitle>
+        <div class="flex flex-wrap items-end justify-between gap-2">
+          <CardTitle>Recent Entries</CardTitle>
+          <p v-if="entriesCountHint" class="text-xs text-muted-foreground">
+            {{ entriesCountHint }}
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <RecentEntries />

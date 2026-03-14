@@ -17,6 +17,42 @@ const store = useGroupsStore()
 const groupId = computed(() => route.params.id as string)
 const copied = ref(false)
 const showLeaveConfirm = ref(false)
+const membersSentinelRef = ref<HTMLElement | null>(null)
+
+const MEMBERS_INITIAL_BATCH = 40
+const MEMBERS_BATCH_SIZE = 25
+const visibleMemberCount = ref(MEMBERS_INITIAL_BATCH)
+
+const visibleMembers = computed(() => store.currentMembers.slice(0, visibleMemberCount.value))
+const hasMoreMembers = computed(() => visibleMemberCount.value < store.currentMembers.length)
+
+let membersObserver: IntersectionObserver | null = null
+
+function loadMoreMembers() {
+  if (!hasMoreMembers.value) return
+  visibleMemberCount.value = Math.min(
+    store.currentMembers.length,
+    visibleMemberCount.value + MEMBERS_BATCH_SIZE,
+  )
+}
+
+function setupMembersObserver() {
+  membersObserver?.disconnect()
+
+  const el = membersSentinelRef.value
+  if (!el) return
+
+  membersObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting) {
+        loadMoreMembers()
+      }
+    },
+    { rootMargin: '300px 0px' },
+  )
+
+  membersObserver.observe(el)
+}
 
 const isOwner = computed(() => {
   const userId = pb.authStore.record?.id
@@ -29,18 +65,34 @@ onMounted(async () => {
   // Subscribe to real-time goal updates
   const memberIds = store.currentMembers.map((m) => m.user)
   store.subscribeGroupGoals(memberIds)
+  setupMembersObserver()
 })
 
 onUnmounted(() => {
   store.unsubscribeGroupGoals()
+  membersObserver?.disconnect()
+  membersObserver = null
 })
 
 // Re-load if route params change
 watch(groupId, async (newId) => {
   store.unsubscribeGroupGoals()
   await store.loadGroupDetail(newId)
+  visibleMemberCount.value = MEMBERS_INITIAL_BATCH
   const memberIds = store.currentMembers.map((m) => m.user)
   store.subscribeGroupGoals(memberIds)
+  setupMembersObserver()
+})
+
+watch(
+  () => store.currentMembers.length,
+  () => {
+    visibleMemberCount.value = MEMBERS_INITIAL_BATCH
+  },
+)
+
+watch(membersSentinelRef, () => {
+  setupMembersObserver()
 })
 
 async function copyInviteCode() {
@@ -117,11 +169,17 @@ async function handleLeave() {
         <h3 class="text-lg font-semibold">Members</h3>
         <div class="space-y-6">
           <MemberGoalsList
-            v-for="member in store.currentMembers"
+            v-for="member in visibleMembers"
             :key="member.id"
             :member="member"
             :goals="store.currentGoals"
           />
+
+          <div ref="membersSentinelRef" class="h-2" aria-hidden="true" />
+
+          <div v-if="hasMoreMembers" class="flex justify-center">
+            <Button variant="outline" @click="loadMoreMembers">Load more members</Button>
+          </div>
         </div>
       </div>
 

@@ -27,6 +27,41 @@ const chartConfig: ChartConfig = {
 
 const data = computed(() => store.calorieChartData as ChartDatum[])
 
+const plottedData = computed((): ChartDatum[] => {
+  if (data.value.length <= 120) return data.value
+
+  const bucketSize = Math.ceil(data.value.length / 120)
+  const buckets: ChartDatum[] = []
+
+  for (let i = 0; i < data.value.length; i += bucketSize) {
+    const chunk = data.value.slice(i, i + bucketSize)
+    if (chunk.length === 0) continue
+
+    const consumedValues = chunk.filter((d) => d.hasConsumed).map((d) => d.consumed)
+    const goalValues = chunk.filter((d) => d.hasGoal).map((d) => d.goal)
+
+    const consumed =
+      consumedValues.length > 0
+        ? Math.round(consumedValues.reduce((sum, value) => sum + value, 0) / consumedValues.length)
+        : 0
+    const goal =
+      goalValues.length > 0
+        ? Math.round(goalValues.reduce((sum, value) => sum + value, 0) / goalValues.length)
+        : 0
+
+    const last = chunk[chunk.length - 1]!
+    buckets.push({
+      date: last.date,
+      consumed,
+      goal,
+      hasConsumed: consumedValues.length > 0,
+      hasGoal: goalValues.length > 0,
+    })
+  }
+
+  return buckets
+})
+
 // Use index as X so each data point gets exactly one tick — no repeated date labels
 const x = (_d: ChartDatum, i: number) => i
 
@@ -49,26 +84,28 @@ const tooltipIndicatorColor = (d: ChartDatum) => barColor(d)
 
 // Map index back to the date label of that data point
 const xTickFormat = (i: number) => {
-  const d = data.value[Math.round(i)]
+  const d = plottedData.value[Math.round(i)]
   return d ? formatDateCompact(d.date) : ''
 }
 
 const chartMargin = { top: 10, right: 10, bottom: 30, left: 55 }
 const yAccessors = [yConsumed]
 
-const numTicks = computed(() => Math.min(data.value.length, 12))
+const numTicks = computed(() => Math.min(plottedData.value.length, 12))
 
 const domainY = computed((): [number, number] => {
-  if (data.value.length === 0) return [0, 3000]
-  const values = data.value.filter((d) => d.hasConsumed).map((d) => d.consumed)
+  if (plottedData.value.length === 0) return [0, 3000]
+  const values = plottedData.value.filter((d) => d.hasConsumed).map((d) => d.consumed)
   if (values.length === 0) return [0, 3000]
   return [0, Math.max(...values) * 1.15]
 })
+
+const barPadding = computed(() => (plottedData.value.length > 80 ? 0.1 : 0.3))
 </script>
 
 <template>
   <div
-    v-if="data.length === 0"
+    v-if="plottedData.length === 0"
     class="flex h-[280px] flex-col items-center justify-center gap-2 text-center"
   >
     <Icon icon="lucide:bar-chart-3" class="h-12 w-12 text-muted-foreground/25 animate-gentle-bob" />
@@ -76,12 +113,12 @@ const domainY = computed((): [number, number] => {
     <p class="text-xs text-muted-foreground">Log your first calories to see your chart</p>
   </div>
   <ChartContainer v-else :config="chartConfig" class="h-[280px] w-full">
-    <VisXYContainer :data="data" :margin="chartMargin" :domain-y="domainY">
+    <VisXYContainer :data="plottedData" :margin="chartMargin" :domain-y="domainY">
       <VisStackedBar
         :x="x"
         :y="yAccessors"
         :color="barColor"
-        :bar-padding="0.3"
+        :bar-padding="barPadding"
         :rounded-corners="4"
       />
       <VisAxis type="x" :tick-format="xTickFormat" :num-ticks="numTicks" label="" />

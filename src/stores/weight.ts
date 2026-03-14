@@ -26,6 +26,7 @@ import { useGroupsStore } from '@/stores/groups'
 
 type AverageMode = 'daily' | 'weekly' | 'monthly'
 export type CsvDataType = 'weight' | 'calories'
+type CustomDateRange = { start: string; end: string }
 
 export interface CsvImportError {
   row: number
@@ -100,6 +101,24 @@ function cutoffISO(days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function isDateInRange(
+  date: string,
+  range: TimeRange,
+  customRange: CustomDateRange | null,
+): boolean {
+  if (range === 'custom') {
+    if (!customRange) {
+      return date >= cutoffISO(30)
+    }
+    if (customRange.start > customRange.end) {
+      return false
+    }
+    return date >= customRange.start && date <= customRange.end
+  }
+
+  return date >= cutoffISO(range)
+}
+
 // ── Store ──
 
 export const useWeightStore = defineStore('weight', () => {
@@ -118,6 +137,8 @@ export const useWeightStore = defineStore('weight', () => {
 
   const weightTimeRange = ref<TimeRange>(90)
   const calorieTimeRange = ref<TimeRange>(30)
+  const weightCustomRange = ref<CustomDateRange | null>(null)
+  const calorieCustomRange = ref<CustomDateRange | null>(null)
   const averageMode = ref<AverageMode>('daily')
 
   // ── Calorie state ──
@@ -263,6 +284,11 @@ export const useWeightStore = defineStore('weight', () => {
       sex: undefined,
     }
     settingsRecordId.value = null
+    weightTimeRange.value = 90
+    calorieTimeRange.value = 30
+    weightCustomRange.value = null
+    calorieCustomRange.value = null
+    averageMode.value = 'daily'
     isSynced.value = false
   }
 
@@ -312,8 +338,9 @@ export const useWeightStore = defineStore('weight', () => {
   )
 
   const filteredEntries = computed(() => {
-    const cutoffStr = cutoffISO(weightTimeRange.value)
-    return sortedEntries.value.filter((e) => e.date >= cutoffStr)
+    return sortedEntries.value.filter((e) =>
+      isDateInRange(e.date, weightTimeRange.value, weightCustomRange.value),
+    )
   })
 
   const latestEntry = computed(() => sortedEntries.value.at(-1))
@@ -444,33 +471,30 @@ export const useWeightStore = defineStore('weight', () => {
     return result
   }
 
-  function getEffectiveKcalGoal(date: string): {
-    goal: number | null
-    source: 'global' | 'override' | 'none'
-  } {
-    const entry = calorieEntries.value.find((e) => e.date === date)
-    if (entry?.goalOverrideKcal != null) {
-      return { goal: entry.goalOverrideKcal, source: 'override' }
-    }
-    const globalGoal = getGlobalKcalGoalForDate(date)
-    if (globalGoal !== null) {
-      return { goal: globalGoal, source: 'global' }
-    }
-    return { goal: null, source: 'none' }
-  }
-
   // ── Derived daily calorie rows — only dates with a logged entry ──
 
   const dailyCalorieRows = computed((): DailyCalorieRow[] => {
-    const cutoffStr = cutoffISO(calorieTimeRange.value)
+    const goals = sortedKcalGoalHistory.value
+    let goalIndex = 0
+    let activeGlobalGoal: number | null = null
 
-    // Only include entries within the time range, sorted oldest → newest
     const inRange = [...calorieEntries.value]
-      .filter((e) => e.date >= cutoffStr)
+      .filter((e) => isDateInRange(e.date, calorieTimeRange.value, calorieCustomRange.value))
       .sort((a, b) => a.date.localeCompare(b.date))
 
     return inRange.map((entry) => {
-      const { goal, source } = getEffectiveKcalGoal(entry.date)
+      while (goalIndex < goals.length && goals[goalIndex]!.effectiveFrom <= entry.date) {
+        activeGlobalGoal = goals[goalIndex]!.kcal
+        goalIndex++
+      }
+
+      const hasOverride = entry.goalOverrideKcal != null
+      const goal = hasOverride ? entry.goalOverrideKcal! : activeGlobalGoal
+      const source: DailyCalorieRow['goalSource'] = hasOverride
+        ? 'override'
+        : goal !== null
+          ? 'global'
+          : 'none'
       const consumed = entry.calories
 
       let delta: number | null = null
@@ -594,6 +618,14 @@ export const useWeightStore = defineStore('weight', () => {
 
   function setCalorieTimeRange(range: TimeRange) {
     calorieTimeRange.value = range
+  }
+
+  function setWeightCustomRange(range: CustomDateRange | null) {
+    weightCustomRange.value = range
+  }
+
+  function setCalorieCustomRange(range: CustomDateRange | null) {
+    calorieCustomRange.value = range
   }
 
   function setAverageMode(mode: AverageMode) {
@@ -781,6 +813,8 @@ export const useWeightStore = defineStore('weight', () => {
     settings,
     weightTimeRange,
     calorieTimeRange,
+    weightCustomRange,
+    calorieCustomRange,
     averageMode,
     isLoading,
     isSynced,
@@ -805,6 +839,8 @@ export const useWeightStore = defineStore('weight', () => {
     persistSettings,
     setWeightTimeRange,
     setCalorieTimeRange,
+    setWeightCustomRange,
+    setCalorieCustomRange,
     setAverageMode,
     // Calories
     calorieEntries,

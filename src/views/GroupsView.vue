@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useGroupsStore } from '@/stores/groups'
@@ -13,9 +13,62 @@ const store = useGroupsStore()
 
 const showCreateDialog = ref(false)
 const showJoinDialog = ref(false)
+const groupsSentinelRef = ref<HTMLElement | null>(null)
+
+const GROUPS_INITIAL_BATCH = 24
+const GROUPS_BATCH_SIZE = 16
+const visibleGroupCount = ref(GROUPS_INITIAL_BATCH)
+
+const visibleGroups = computed(() => store.myGroups.slice(0, visibleGroupCount.value))
+const hasMoreGroups = computed(() => visibleGroupCount.value < store.myGroups.length)
+
+let groupsObserver: IntersectionObserver | null = null
+
+function loadMoreGroups() {
+  if (!hasMoreGroups.value) return
+  visibleGroupCount.value = Math.min(
+    store.myGroups.length,
+    visibleGroupCount.value + GROUPS_BATCH_SIZE,
+  )
+}
+
+function setupGroupsObserver() {
+  groupsObserver?.disconnect()
+
+  const el = groupsSentinelRef.value
+  if (!el) return
+
+  groupsObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting) {
+        loadMoreGroups()
+      }
+    },
+    { rootMargin: '300px 0px' },
+  )
+
+  groupsObserver.observe(el)
+}
 
 onMounted(() => {
   store.loadMyGroups()
+  setupGroupsObserver()
+})
+
+watch(
+  () => store.myGroups.length,
+  () => {
+    visibleGroupCount.value = GROUPS_INITIAL_BATCH
+  },
+)
+
+watch(groupsSentinelRef, () => {
+  setupGroupsObserver()
+})
+
+onBeforeUnmount(() => {
+  groupsObserver?.disconnect()
+  groupsObserver = null
 })
 
 function onCreated(groupId: string) {
@@ -50,29 +103,37 @@ function onJoined(groupId: string) {
     </div>
 
     <!-- Group list -->
-    <div v-else-if="store.myGroups.length > 0" class="grid gap-4 sm:grid-cols-2">
-      <Card
-        v-for="group in store.myGroups"
-        :key="group.id"
-        class="cursor-pointer transition-all duration-200 hover:bg-muted/50 hover:shadow-warm hover:-translate-y-0.5"
-        @click="router.push(`/groups/${group.id}`)"
-      >
-        <CardHeader class="pb-2">
-          <div class="flex items-start justify-between">
-            <CardTitle class="text-base">{{ group.name }}</CardTitle>
-            <Icon
-              icon="lucide:chevron-right"
-              class="h-4 w-4 text-muted-foreground shrink-0 mt-0.5"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p v-if="group.description" class="text-sm text-muted-foreground line-clamp-2">
-            {{ group.description }}
-          </p>
-          <p v-else class="text-sm text-muted-foreground italic">No description</p>
-        </CardContent>
-      </Card>
+    <div v-else-if="store.myGroups.length > 0" class="space-y-4">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <Card
+          v-for="group in visibleGroups"
+          :key="group.id"
+          class="cursor-pointer transition-all duration-200 hover:bg-muted/50 hover:shadow-warm hover:-translate-y-0.5"
+          @click="router.push(`/groups/${group.id}`)"
+        >
+          <CardHeader class="pb-2">
+            <div class="flex items-start justify-between">
+              <CardTitle class="text-base">{{ group.name }}</CardTitle>
+              <Icon
+                icon="lucide:chevron-right"
+                class="h-4 w-4 text-muted-foreground shrink-0 mt-0.5"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p v-if="group.description" class="text-sm text-muted-foreground line-clamp-2">
+              {{ group.description }}
+            </p>
+            <p v-else class="text-sm text-muted-foreground italic">No description</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div ref="groupsSentinelRef" class="h-2" aria-hidden="true" />
+
+      <div v-if="hasMoreGroups" class="flex justify-center">
+        <Button variant="outline" @click="loadMoreGroups">Load more groups</Button>
+      </div>
     </div>
 
     <!-- Empty state -->

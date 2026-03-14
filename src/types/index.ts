@@ -68,7 +68,7 @@ export interface Goal {
 
 export type WeightUnit = 'kg' | 'lbs'
 
-export type TimeRange = 7 | 30 | 60 | 90
+export type TimeRange = 7 | 30 | 90 | 'custom'
 
 export type Sex = 'male' | 'female'
 export type GoalDirection = 'loss' | 'gain'
