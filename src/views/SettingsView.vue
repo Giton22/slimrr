@@ -620,7 +620,7 @@ const weightUnitLabel = computed(() => (isKg.value ? 'kg' : 'lbs'))
                     class="mr-2 h-4 w-4 animate-spin"
                   />
                   <Icon v-else icon="lucide:upload" class="mr-2 h-4 w-4" />
-                  {{ isImporting ? 'Importing...' : 'Import CSV (Upsert)' }}
+                  {{ isImporting ? 'Importing...' : 'Import CSV' }}
                 </Button>
                 <span class="text-xs text-muted-foreground">
                   Existing rows with the same date are updated.
