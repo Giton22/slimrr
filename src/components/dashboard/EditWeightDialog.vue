@@ -28,7 +28,7 @@ const props = defineProps<{
 const store = useWeightStore()
 const { isKg, convert, toKg } = useUnits()
 
-const weightField = useNumericField({ min: 0, required: true })
+const weightField = useNumericField({ min: 1, required: true })
 const noteValue = ref('')
 const saving = ref(false)
 const weightInputRef = ref<InstanceType<typeof Input> | null>(null)

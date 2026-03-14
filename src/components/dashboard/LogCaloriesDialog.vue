@@ -22,7 +22,7 @@ const store = useWeightStore()
 
 const open = ref(false)
 const date = ref(todayISO())
-const caloriesField = useNumericField({ min: 0, required: true, allowDecimals: false })
+const caloriesField = useNumericField({ min: 1, required: true, allowDecimals: false })
 const note = ref('')
 const saving = ref(false)
 const caloriesInputRef = ref<InstanceType<typeof Input> | null>(null)

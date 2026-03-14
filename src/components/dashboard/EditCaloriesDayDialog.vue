@@ -27,7 +27,7 @@ const props = defineProps<{
 
 const store = useWeightStore()
 
-const consumedField = useNumericField({ min: 0, required: false, allowDecimals: false })
+const consumedField = useNumericField({ min: 1, required: false, allowDecimals: false })
 const overrideField = useNumericField({ min: 1, required: false, allowDecimals: false })
 const saving = ref(false)
 

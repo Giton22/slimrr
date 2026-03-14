@@ -4,7 +4,7 @@ import type { RecordModel } from 'pocketbase'
 // ── PocketBase client (singleton) ──
 
 const configuredPbUrl = import.meta.env.VITE_PB_URL?.trim()
-const pocketbaseUrl = new URL(configuredPbUrl || '/', window.location.origin).toString()
+export const pocketbaseUrl = new URL(configuredPbUrl || '/', window.location.origin).toString()
 
 export const pb = new PocketBase(pocketbaseUrl)
 

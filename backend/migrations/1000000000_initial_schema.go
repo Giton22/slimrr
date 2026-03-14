@@ -2,8 +2,8 @@ package migrations
 
 import (
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/types"
 	m "github.com/pocketbase/pocketbase/migrations"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 func init() {
@@ -73,13 +73,13 @@ func init() {
 			&core.NumberField{
 				Name:     "calories",
 				Required: false,
-				Min:      types.Pointer(0.0),
+				Min:      types.Pointer(1.0),
 				Max:      types.Pointer(99999.0),
 			},
 			&core.NumberField{
 				Name:     "goal_override_kcal",
 				Required: false,
-				Min:      types.Pointer(0.0),
+				Min:      types.Pointer(1.0),
 				Max:      types.Pointer(99999.0),
 			},
 			&core.TextField{
@@ -116,7 +116,7 @@ func init() {
 			&core.NumberField{
 				Name:     "kcal",
 				Required: true,
-				Min:      types.Pointer(0.0),
+				Min:      types.Pointer(1.0),
 				Max:      types.Pointer(99999.0),
 			},
 		)

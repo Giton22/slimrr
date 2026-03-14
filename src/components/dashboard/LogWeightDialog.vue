@@ -24,7 +24,7 @@ const { isKg, convert, toKg } = useUnits()
 
 const open = ref(false)
 const date = ref(todayISO())
-const weightField = useNumericField({ min: 0, required: true })
+const weightField = useNumericField({ min: 1, required: true })
 const note = ref('')
 const saving = ref(false)
 const weightInputRef = ref<InstanceType<typeof Input> | null>(null)

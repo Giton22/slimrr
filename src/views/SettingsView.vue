@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue-sonner'
 import { useWeightStore } from '@/stores/weight'
+import type { CsvDataType } from '@/stores/weight'
 import { useAuthStore } from '@/stores/auth'
 import { useUnits } from '@/composables/useUnits'
 import { useTheme, type ColorTheme } from '@/composables/useTheme'
@@ -68,6 +69,12 @@ const isSaving = ref(false)
 const saveSuccess = ref(false)
 const resetDialogOpen = ref(false)
 const isResettingData = ref(false)
+const importType = ref<CsvDataType>('weight')
+const importFile = ref<File | null>(null)
+const importInputRef = ref<HTMLInputElement | null>(null)
+const isImporting = ref(false)
+const isExportingWeight = ref(false)
+const isExportingCalories = ref(false)
 
 // Convert stored kg goal to display unit string
 function kgToDisplayStr(kg: number): string {
@@ -165,6 +172,74 @@ async function resetUserData() {
     toast.error('Failed to reset your data. Please try again.')
   } finally {
     isResettingData.value = false
+  }
+}
+
+function onImportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  importFile.value = input.files?.[0] ?? null
+}
+
+const importExpectedHeaders = computed(() =>
+  importType.value === 'weight' ? 'date,weight_kg,note' : 'date,calories,goal_override_kcal,note',
+)
+
+function setImportType(value: string) {
+  if (value === 'weight' || value === 'calories') {
+    importType.value = value
+  }
+}
+
+async function exportData(type: CsvDataType) {
+  const loading = type === 'weight' ? isExportingWeight : isExportingCalories
+  if (loading.value) return
+
+  loading.value = true
+  try {
+    const { filename, blob } = await store.exportCsv(type)
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = filename
+    document.body.append(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(objectUrl)
+
+    toast.success(`${type === 'weight' ? 'Weight' : 'Calories'} CSV downloaded.`)
+  } catch {
+    toast.error(`Failed to export ${type} CSV. Please try again.`)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function importData() {
+  if (!importFile.value || isImporting.value) return
+
+  isImporting.value = true
+  try {
+    const result = await store.importCsv(importType.value, importFile.value)
+    const errorCount = result.errors.length
+    const message = `Created ${result.created}, updated ${result.updated}, skipped ${result.skipped}${errorCount ? `, ${errorCount} errors` : ''}.`
+
+    if (errorCount > 0) {
+      const firstError = result.errors[0]
+      toast.warning(
+        `Import finished with issues. ${message} First error (row ${firstError?.row}): ${firstError?.message}`,
+      )
+    } else {
+      toast.success(`Import completed. ${message}`)
+    }
+
+    importFile.value = null
+    if (importInputRef.value) {
+      importInputRef.value.value = ''
+    }
+  } catch {
+    toast.error('Import failed. Please check your CSV and try again.')
+  } finally {
+    isImporting.value = false
   }
 }
 
@@ -458,6 +533,100 @@ const weightUnitLabel = computed(() => (isKg.value ? 'kg' : 'lbs'))
                 </div>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <!-- ── Data Import / Export Card ── -->
+        <Card class="shadow-warm">
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <Icon icon="lucide:file-spreadsheet" class="h-5 w-5 text-primary" />
+              Data Import / Export
+            </CardTitle>
+            <CardDescription>
+              Export your tracking data to CSV, edit in Excel, and import it back with upsert.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="grid gap-5">
+            <div class="grid gap-2 rounded-lg border p-4">
+              <p class="text-sm font-medium">Export</p>
+              <p class="text-xs text-muted-foreground">Download your current data as CSV files.</p>
+              <div class="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  :disabled="isExportingWeight"
+                  @click="exportData('weight')"
+                >
+                  <Icon
+                    v-if="isExportingWeight"
+                    icon="lucide:loader-circle"
+                    class="mr-2 h-4 w-4 animate-spin"
+                  />
+                  <Icon v-else icon="lucide:download" class="mr-2 h-4 w-4" />
+                  Export Weight CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  :disabled="isExportingCalories"
+                  @click="exportData('calories')"
+                >
+                  <Icon
+                    v-if="isExportingCalories"
+                    icon="lucide:loader-circle"
+                    class="mr-2 h-4 w-4 animate-spin"
+                  />
+                  <Icon v-else icon="lucide:download" class="mr-2 h-4 w-4" />
+                  Export Calories CSV
+                </Button>
+              </div>
+            </div>
+
+            <div class="grid gap-3 rounded-lg border p-4">
+              <p class="text-sm font-medium">Import</p>
+              <p class="text-xs text-muted-foreground">
+                Required headers for selected type: <code>{{ importExpectedHeaders }}</code>
+              </p>
+              <div class="grid gap-3 sm:grid-cols-[180px_1fr] sm:items-end">
+                <div class="grid gap-1.5">
+                  <Label>Data Type</Label>
+                  <Select :model-value="importType" @update:model-value="setImportType">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weight">Weight</SelectItem>
+                      <SelectItem value="calories">Calories</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="grid gap-1.5">
+                  <Label for="csv-upload">CSV File</Label>
+                  <Input
+                    id="csv-upload"
+                    ref="importInputRef"
+                    type="file"
+                    accept=".csv,text/csv"
+                    @change="onImportFileChange"
+                  />
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <Button type="button" :disabled="!importFile || isImporting" @click="importData">
+                  <Icon
+                    v-if="isImporting"
+                    icon="lucide:loader-circle"
+                    class="mr-2 h-4 w-4 animate-spin"
+                  />
+                  <Icon v-else icon="lucide:upload" class="mr-2 h-4 w-4" />
+                  {{ isImporting ? 'Importing...' : 'Import CSV (Upsert)' }}
+                </Button>
+                <span class="text-xs text-muted-foreground">
+                  Existing rows with the same date are updated.
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

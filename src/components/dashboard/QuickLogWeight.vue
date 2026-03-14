@@ -19,7 +19,7 @@ const todayEntry = computed(() => store.sortedEntries.find((e) => e.date === tod
 
 const editing = ref(false)
 const saving = ref(false)
-const weightField = useNumericField({ min: 0, required: true })
+const weightField = useNumericField({ min: 1, required: true })
 const inputRef = ref<InstanceType<typeof Input> | null>(null)
 
 function startEditing() {

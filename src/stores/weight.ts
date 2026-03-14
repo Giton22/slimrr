@@ -11,7 +11,7 @@ import type {
   UserSettings,
   WeightEntry,
 } from '@/types'
-import { pb, COLLECTIONS } from '@/lib/pocketbase'
+import { pb, COLLECTIONS, pocketbaseUrl } from '@/lib/pocketbase'
 import type {
   WeightEntryRecord,
   CalorieEntryRecord,
@@ -25,6 +25,21 @@ import { getBmiCategory } from '@/composables/useBmi'
 import { useGroupsStore } from '@/stores/groups'
 
 type AverageMode = 'daily' | 'weekly' | 'monthly'
+export type CsvDataType = 'weight' | 'calories'
+
+export interface CsvImportError {
+  row: number
+  message: string
+}
+
+export interface CsvImportResult {
+  type: CsvDataType
+  totalRows: number
+  created: number
+  updated: number
+  skipped: number
+  errors: CsvImportError[]
+}
 
 // ── Record → domain type mappers ──
 
@@ -721,6 +736,45 @@ export const useWeightStore = defineStore('weight', () => {
     kcalGoalHistory.value = []
   }
 
+  async function importCsv(type: CsvDataType, file: File): Promise<CsvImportResult> {
+    const formData = new FormData()
+    formData.append('type', type)
+    formData.append('file', file)
+
+    const result = await pb.send<CsvImportResult>('/api/data/import/csv', {
+      method: 'POST',
+      body: formData,
+    })
+
+    await loadAll()
+    return result
+  }
+
+  async function exportCsv(type: CsvDataType): Promise<{ filename: string; blob: Blob }> {
+    const url = new URL('/api/data/export/csv', pocketbaseUrl)
+    url.searchParams.set('type', type)
+
+    const headers: HeadersInit = {}
+    if (pb.authStore.token) {
+      headers.Authorization = `Bearer ${pb.authStore.token}`
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers,
+    })
+
+    if (!response.ok) {
+      throw new Error('Export failed')
+    }
+
+    const blob = await response.blob()
+    const disposition = response.headers.get('content-disposition')
+    const filename = extractFilenameFromDisposition(disposition) ?? `${type}.csv`
+
+    return { filename, blob }
+  }
+
   return {
     // Weight
     entries,
@@ -766,6 +820,8 @@ export const useWeightStore = defineStore('weight', () => {
     saveDailyCalories,
     deleteCalorieEntry,
     resetUserData,
+    importCsv,
+    exportCsv,
     settingsRecordId,
     // Lifecycle
     loadAll,
@@ -774,3 +830,19 @@ export const useWeightStore = defineStore('weight', () => {
     reset,
   }
 })
+
+function extractFilenameFromDisposition(disposition: string | null): string | null {
+  if (!disposition) return null
+
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+
+  const simpleMatch = disposition.match(/filename="?([^";]+)"?/i)
+  if (simpleMatch?.[1]) {
+    return simpleMatch[1]
+  }
+
+  return null
+}
