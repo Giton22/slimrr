@@ -9,8 +9,9 @@ COPY package.json pnpm-lock.yaml ./
 # Use the package manager declared in package.json (pnpm via Corepack)
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
-# Install all dependencies (including devDependencies needed for build)
-RUN pnpm install --frozen-lockfile
+# Install all dependencies (including devDependencies needed for build).
+# Skip git hook setup in container builds.
+RUN VITE_GIT_HOOKS=0 HUSKY=0 pnpm install --frozen-lockfile
 
 # Copy the rest of the source
 COPY . .
