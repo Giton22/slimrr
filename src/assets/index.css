@@ -484,6 +484,9 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--primary) 40%, var(--muted-foreground) 60%)
+      color-mix(in srgb, var(--muted) 72%, var(--background) 28%);
   }
   body {
     @apply bg-background text-foreground;
@@ -511,6 +514,36 @@
   .dark [role='combobox']:focus {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 32%, transparent);
   }
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--muted) 72%, var(--background) 28%);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  background: color-mix(in srgb, var(--primary) 40%, var(--muted-foreground) 60%);
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--primary) 56%, var(--muted-foreground) 44%);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--primary) 72%, var(--muted-foreground) 28%);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Route transitions */
