@@ -49,7 +49,8 @@ const parsedResult = ref<{
   offId: string
 } | null>(null)
 const errorMessage = ref('')
-const fileInput = ref<HTMLInputElement | null>(null)
+const fileInputCamera = ref<HTMLInputElement | null>(null)
+const fileInputUpload = ref<HTMLInputElement | null>(null)
 
 function onOpenChange(value: boolean) {
   open.value = value
@@ -66,8 +67,12 @@ function resetState() {
   errorMessage.value = ''
 }
 
-function triggerFileInput() {
-  fileInput.value?.click()
+function triggerCameraInput() {
+  fileInputCamera.value?.click()
+}
+
+function triggerUploadInput() {
+  fileInputUpload.value?.click()
 }
 
 function onFileSelected(event: Event) {
@@ -130,31 +135,44 @@ function useResult() {
           Scan Nutrition Label
         </DialogTitle>
         <DialogDescription>
-          Take a photo of a nutrition facts label to extract data.
+          Take a photo or upload an image of a nutrition facts label.
         </DialogDescription>
       </DialogHeader>
 
       <div class="space-y-4 py-4">
         <input
-          ref="fileInput"
+          ref="fileInputCamera"
           type="file"
           accept="image/*"
           capture="environment"
           class="hidden"
           @change="onFileSelected"
         />
+        <input
+          ref="fileInputUpload"
+          type="file"
+          accept="image/*"
+          class="hidden"
+          @change="onFileSelected"
+        />
 
         <!-- No image yet -->
-        <div v-if="!imagePreview" class="flex flex-col items-center gap-3">
+        <div v-if="!imagePreview" class="flex gap-3">
           <button
             type="button"
-            class="flex h-40 w-full items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 transition-colors hover:border-primary/50 hover:bg-muted/50"
-            @click="triggerFileInput"
+            class="flex h-32 flex-1 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
+            @click="triggerCameraInput"
           >
-            <div class="flex flex-col items-center gap-2 text-muted-foreground">
-              <Icon icon="lucide:camera" class="h-8 w-8" />
-              <span class="text-sm">Tap to take photo or choose image</span>
-            </div>
+            <Icon icon="lucide:camera" class="h-7 w-7" />
+            <span class="text-sm font-medium">Take Photo</span>
+          </button>
+          <button
+            type="button"
+            class="flex h-32 flex-1 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
+            @click="triggerUploadInput"
+          >
+            <Icon icon="lucide:image" class="h-7 w-7" />
+            <span class="text-sm font-medium">Upload Image</span>
           </button>
         </div>
 
@@ -179,7 +197,7 @@ function useResult() {
           <!-- Analyze button (before result) -->
           <div v-if="!parsedResult && !analyzing">
             <div class="flex gap-2">
-              <Button variant="outline" size="sm" class="flex-1" @click="triggerFileInput">
+              <Button variant="outline" size="sm" class="flex-1" @click="triggerUploadInput">
                 <Icon icon="lucide:refresh-cw" class="mr-2 h-4 w-4" />
                 Retake
               </Button>
@@ -216,7 +234,7 @@ function useResult() {
               :fat-per100g="parsedResult.fatPer100g"
             />
             <DialogFooter class="gap-2 sm:gap-0">
-              <Button variant="outline" size="sm" @click="triggerFileInput"> Retake </Button>
+              <Button variant="outline" size="sm" @click="triggerUploadInput"> Retake </Button>
               <Button size="sm" @click="useResult">
                 <Icon icon="lucide:check" class="mr-2 h-4 w-4" />
                 Use This
