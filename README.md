@@ -92,7 +92,7 @@ docker run --rm \
 ### Prerequisites
 
 - Node.js (^20.19 or >=22.12)
-- [Vite+](https://vite.dev/plus/) (`vp`) — the unified toolchain used by this project
+- [Vite+](https://viteplus.dev/) (`vp`) — the unified toolchain used by this project
 - Docker
 
 ### Setup
