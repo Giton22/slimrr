@@ -312,7 +312,7 @@ const recentFoodsForDisplay = computed(() => foodStore.recentFoods.slice(0, 6))
           <div v-else-if="hasSearchResults" class="space-y-3">
             <div v-if="personalMatches.length > 0">
               <p class="px-3 pt-2 text-xs font-medium text-muted-foreground">My Foods</p>
-              <div class="p-1.5">
+              <div class="space-y-1.5 p-1.5">
                 <FoodItemCard
                   v-for="item in personalMatches"
                   :key="item.id"
@@ -330,7 +330,7 @@ const recentFoodsForDisplay = computed(() => foodStore.recentFoods.slice(0, 6))
 
             <div v-if="foodStore.searchResults.length > 0">
               <p class="px-3 pt-2 text-xs font-medium text-muted-foreground">OpenFoodFacts</p>
-              <div class="p-1.5">
+              <div class="space-y-1.5 p-1.5">
                 <FoodItemCard
                   v-for="result in foodStore.searchResults"
                   :key="result.barcode"
