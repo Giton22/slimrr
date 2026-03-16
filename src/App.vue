@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Toaster } from 'vue-sonner'
 import AppShell from '@/components/layout/AppShell.vue'
+import PwaUpdatePrompt from '@/components/PwaUpdatePrompt.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWeightStore } from '@/stores/weight'
 import { useFoodStore } from '@/stores/food'
@@ -65,5 +66,6 @@ watch(
 
   <Teleport to="body">
     <Toaster rich-colors close-button position="bottom-right" />
+    <PwaUpdatePrompt />
   </Teleport>
 </template>
