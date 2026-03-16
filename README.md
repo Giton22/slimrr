@@ -2,6 +2,18 @@
 
 A self-hosted weight and calorie tracking web app. Built with Vue 3, PocketBase, and Tailwind CSS.
 
+> This entire codebase was written with AI.
+
+## Features
+
+- **Weight tracking** — log daily entries, visualize trends with charts, and track progress toward your goal
+- **Calorie & macro tracking** — log meals with protein, carbs, and fat; set daily calorie goals
+- **Food database** — search foods via OpenFoodFacts, scan barcodes, or add custom items
+- **Nutrition label scanning** — snap a photo of a nutrition label to auto-fill values (requires Vision API)
+- **Groups** — create or join groups with invite codes for shared goal tracking
+- **Data portability** — import and export your data via CSV
+- **Self-hosted** — all data stays on your server with PocketBase as the backend
+
 ## Self-Hosting
 
 ### Quick Start
@@ -23,6 +35,16 @@ docker compose up -d
 Then open `http://localhost:8090` in your browser.
 
 The PocketBase admin panel is available at `http://localhost:8090/_/`.
+
+### Nutrition Label Scanning (optional)
+
+To enable nutrition label scanning from photos, set the Vision API environment variables in your `.env` file:
+
+```sh
+VISION_API_URL=https://api.openai.com/v1/chat/completions   # or any compatible endpoint
+VISION_API_KEY=sk-...
+VISION_MODEL=gpt-4o                                          # model with vision support
+```
 
 ### Changing the Port
 
@@ -69,34 +91,35 @@ docker run --rm \
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (or Node.js ≥ 22)
+- Node.js (^20.19 or >=22.12)
+- [Vite+](https://vite.dev/plus/) (`vp`) — the unified toolchain used by this project
 - Docker
 
 ### Setup
 
 ```sh
 # 1. Install frontend dependencies
-bun install
+vp install
 
 # 2. Start PocketBase backend (build from source)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 # 3. Start the Vite dev server
-bun dev
+vp dev
 ```
 
 The dev server runs at `http://localhost:5173` and connects to PocketBase at `http://localhost:8090`.
 
-### Available Scripts
+### Available Commands
 
-| Command              | Description                            |
-| -------------------- | -------------------------------------- |
-| `bun dev`            | Start Vite dev server with hot-reload  |
-| `bun run build`      | Type-check and build for production    |
-| `bun run build-only` | Build without type-checking            |
-| `bun run type-check` | Run TypeScript type checking           |
-| `bun lint`           | Lint and auto-fix with OxLint + ESLint |
-| `bun run format`     | Format `src/` with OxFmt               |
+| Command       | Description                       |
+| ------------- | --------------------------------- |
+| `vp dev`      | Start dev server with hot-reload  |
+| `vp build`    | Build for production              |
+| `vp check`    | Run format, lint, and type checks |
+| `vp lint`     | Lint code with OxLint             |
+| `vp fmt src/` | Format source with OxFmt          |
+| `vp test`     | Run tests with Vitest             |
 
 ### Releases
 
