@@ -27,6 +27,7 @@ const emit = defineEmits<{
       fatPer100g: number
       servingG: number
       offId: string
+      nutritionPer?: number
     },
   ]
 }>()
@@ -47,6 +48,7 @@ const parsedResult = ref<{
   fatPer100g: number
   servingG: number
   offId: string
+  nutritionPer?: number
 } | null>(null)
 const errorMessage = ref('')
 const fileInputCamera = ref<HTMLInputElement | null>(null)
@@ -232,6 +234,7 @@ function useResult() {
               :protein-per100g="parsedResult.proteinPer100g"
               :carbs-per100g="parsedResult.carbsPer100g"
               :fat-per100g="parsedResult.fatPer100g"
+              :nutrition-per="parsedResult.nutritionPer"
             />
             <DialogFooter class="gap-2 sm:gap-0">
               <Button variant="outline" size="sm" @click="triggerUploadInput"> Retake </Button>

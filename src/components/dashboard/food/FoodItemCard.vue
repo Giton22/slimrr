@@ -7,6 +7,7 @@ defineProps<{
   carbsPer100g?: number
   fatPer100g?: number
   servingG?: number
+  nutritionPer?: number
   clickable?: boolean
 }>()
 
@@ -23,7 +24,12 @@ defineEmits<{
   >
     <p class="font-medium">{{ name }}</p>
     <div class="flex items-center justify-between text-xs text-muted-foreground">
-      <span v-if="brand" class="mr-3 truncate">{{ brand }}</span>
+      <span class="mr-3 flex items-center gap-1 truncate">
+        <span v-if="brand">{{ brand }}</span>
+        <span v-if="nutritionPer && nutritionPer !== 100" class="text-muted-foreground/70 italic"
+          >(label per {{ nutritionPer }}g)</span
+        >
+      </span>
       <div class="flex shrink-0 items-center gap-3">
         <span class="font-semibold text-foreground">{{ caloriesPer100g }} kcal</span>
         <span v-if="proteinPer100g">P {{ proteinPer100g }}g</span>

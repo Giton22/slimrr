@@ -16,6 +16,7 @@ interface OFFSearchResult {
   fatPer100g: number
   servingG: number
   offId: string
+  nutritionPer?: number
 }
 
 function toFoodItem(r: FoodItemRecord): FoodItem {
@@ -210,10 +211,10 @@ export const useFoodStore = defineStore('food', () => {
 
     if (foodItem) {
       const factor = amountG / 100
-      calories = overrides?.calories ?? Math.round(foodItem.caloriesPer100g * factor)
-      protein = overrides?.protein ?? Math.round((foodItem.proteinPer100g ?? 0) * factor)
-      carbs = overrides?.carbs ?? Math.round((foodItem.carbsPer100g ?? 0) * factor)
-      fat = overrides?.fat ?? Math.round((foodItem.fatPer100g ?? 0) * factor)
+      calories = overrides?.calories ?? Math.round(foodItem.caloriesPer100g * factor * 10) / 10
+      protein = overrides?.protein ?? Math.round((foodItem.proteinPer100g ?? 0) * factor * 10) / 10
+      carbs = overrides?.carbs ?? Math.round((foodItem.carbsPer100g ?? 0) * factor * 10) / 10
+      fat = overrides?.fat ?? Math.round((foodItem.fatPer100g ?? 0) * factor * 10) / 10
       foodName = foodItem.name
     } else {
       calories = overrides?.calories ?? 0

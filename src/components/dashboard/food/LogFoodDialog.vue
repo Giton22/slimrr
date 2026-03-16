@@ -52,6 +52,7 @@ const pendingOFFResult = ref<{
   fatPer100g: number
   servingG: number
   offId: string
+  nutritionPer?: number
 } | null>(null)
 const lookingUpBarcode = ref(false)
 
@@ -78,25 +79,25 @@ const activeFoodFatPer100 = computed(
 const previewCalories = computed(() => {
   const amount = amountField.numericValue.value
   if (!amount || !activeFoodCalPer100.value) return null
-  return Math.round((activeFoodCalPer100.value * amount) / 100)
+  return Math.round(((activeFoodCalPer100.value * amount) / 100) * 10) / 10
 })
 
 const previewProtein = computed(() => {
   const amount = amountField.numericValue.value
   if (!amount) return null
-  return Math.round(((activeFoodProtPer100.value ?? 0) * amount) / 100)
+  return Math.round((((activeFoodProtPer100.value ?? 0) * amount) / 100) * 10) / 10
 })
 
 const previewCarbs = computed(() => {
   const amount = amountField.numericValue.value
   if (!amount) return null
-  return Math.round(((activeFoodCarbsPer100.value ?? 0) * amount) / 100)
+  return Math.round((((activeFoodCarbsPer100.value ?? 0) * amount) / 100) * 10) / 10
 })
 
 const previewFat = computed(() => {
   const amount = amountField.numericValue.value
   if (!amount) return null
-  return Math.round(((activeFoodFatPer100.value ?? 0) * amount) / 100)
+  return Math.round((((activeFoodFatPer100.value ?? 0) * amount) / 100) * 10) / 10
 })
 
 function resetForm() {
@@ -387,6 +388,7 @@ const recentFoodsForDisplay = computed(() => foodStore.recentFoods.slice(0, 6))
           :protein-per100g="activeFoodProtPer100"
           :carbs-per100g="activeFoodCarbsPer100"
           :fat-per100g="activeFoodFatPer100"
+          :nutrition-per="pendingOFFResult?.nutritionPer"
         />
 
         <div class="grid grid-cols-2 gap-3">

@@ -28,6 +28,7 @@ type normalizedProduct struct {
 	FatPer100g      float64 `json:"fatPer100g"`
 	ServingG        float64 `json:"servingG"`
 	OffId           string  `json:"offId"`
+	NutritionPer    float64 `json:"nutritionPer,omitempty"`
 }
 
 type cacheEntry struct {
@@ -283,13 +284,14 @@ Return ONLY valid JSON with these fields:
 {
   "name": "product name if visible, otherwise 'Unknown Product'",
   "brand": "brand if visible, otherwise empty string",
-  "caloriesPer100g": <number>,
-  "proteinPer100g": <number>,
-  "carbsPer100g": <number>,
-  "fatPer100g": <number>,
-  "servingG": <number, the serving size in grams if shown>
+  "nutritionPer": <number, the reference amount in grams the values are given for, e.g. 100 for "per 100g", 25 for "per 25g", 30 for "per 30g">,
+  "calories": <number>,
+  "protein": <number>,
+  "carbs": <number>,
+  "fat": <number>,
+  "servingG": <number, the serving size in grams if shown separately from nutritionPer>
 }
-If values are given per serving, convert to per 100g.
+Report values EXACTLY as they appear on the label. Do NOT convert to per 100g.
 If a value cannot be determined, use 0.`,
 				},
 				{
@@ -372,13 +374,14 @@ If a value cannot be determined, use 0.`,
 		}
 
 		var parsed struct {
-			Name            string  `json:"name"`
-			Brand           string  `json:"brand"`
-			CaloriesPer100g float64 `json:"caloriesPer100g"`
-			ProteinPer100g  float64 `json:"proteinPer100g"`
-			CarbsPer100g    float64 `json:"carbsPer100g"`
-			FatPer100g      float64 `json:"fatPer100g"`
-			ServingG        float64 `json:"servingG"`
+			Name         string  `json:"name"`
+			Brand        string  `json:"brand"`
+			NutritionPer float64 `json:"nutritionPer"`
+			Calories     float64 `json:"calories"`
+			Protein      float64 `json:"protein"`
+			Carbs        float64 `json:"carbs"`
+			Fat          float64 `json:"fat"`
+			ServingG     float64 `json:"servingG"`
 		}
 		if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 			return e.InternalServerError("failed to parse nutrition data from AI response", err)
@@ -387,18 +390,25 @@ If a value cannot be determined, use 0.`,
 		if parsed.Name == "" {
 			parsed.Name = "Unknown Product"
 		}
+		if parsed.NutritionPer <= 0 {
+			parsed.NutritionPer = 100
+		}
 		if parsed.ServingG <= 0 {
-			parsed.ServingG = 100
+			parsed.ServingG = parsed.NutritionPer
 		}
 
+		factor := 100.0 / parsed.NutritionPer
 		result := normalizedProduct{
 			Name:            parsed.Name,
 			Brand:           parsed.Brand,
-			CaloriesPer100g: roundTo1(parsed.CaloriesPer100g),
-			ProteinPer100g:  roundTo1(parsed.ProteinPer100g),
-			CarbsPer100g:    roundTo1(parsed.CarbsPer100g),
-			FatPer100g:      roundTo1(parsed.FatPer100g),
+			CaloriesPer100g: roundTo1(parsed.Calories * factor),
+			ProteinPer100g:  roundTo1(parsed.Protein * factor),
+			CarbsPer100g:    roundTo1(parsed.Carbs * factor),
+			FatPer100g:      roundTo1(parsed.Fat * factor),
 			ServingG:        parsed.ServingG,
+		}
+		if parsed.NutritionPer != 100 {
+			result.NutritionPer = parsed.NutritionPer
 		}
 
 		return e.JSON(http.StatusOK, result)
