@@ -75,12 +75,14 @@ function getChangeClass(index: number): string {
 </script>
 
 <template>
-  <div class="p-4 lg:p-8">
-    <div class="mx-auto max-w-7xl space-y-6 lg:space-y-8">
-      <!-- Desktop heading -->
-      <div class="hidden lg:block">
-        <h2 class="text-3xl font-black tracking-tight">Weight Tracker</h2>
-        <p class="text-muted-foreground">
+  <div class="min-h-full px-3 pb-20 pt-3 sm:px-4 sm:pt-4 lg:px-8 lg:pb-8 lg:pt-8">
+    <div class="mx-auto max-w-7xl space-y-5 lg:space-y-7">
+      <div>
+        <p class="text-sm font-medium uppercase tracking-[0.22em] text-primary/80">
+          Progress Tracking
+        </p>
+        <h1 class="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">Weight</h1>
+        <p class="mt-2 text-sm text-muted-foreground">
           Consistent tracking is the key to achieving your fitness goals.
         </p>
       </div>
@@ -89,7 +91,7 @@ function getChangeClass(index: number): string {
       <WeightTrackerSkeleton v-if="!store.isSynced" />
 
       <!-- Hero: current weight + log button -->
-      <Card v-if="store.isSynced" class="animate-card-enter shadow-warm">
+      <Card v-if="store.isSynced" class="animate-card-enter rounded-[1.8rem] shadow-warm-lg">
         <CardContent
           class="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between"
         >
@@ -133,9 +135,12 @@ function getChangeClass(index: number): string {
       </Card>
 
       <!-- Grid: Goal Progress + Chart -->
-      <div v-if="store.isSynced" class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div v-if="store.isSynced" class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <!-- Goal Progress (desktop sidebar) -->
-        <Card class="animate-card-enter shadow-warm lg:col-span-1" style="animation-delay: 50ms">
+        <Card
+          class="animate-card-enter rounded-[1.8rem] shadow-warm-lg lg:col-span-1"
+          style="animation-delay: 50ms"
+        >
           <CardContent class="pt-6">
             <h3 class="mb-6 text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Current Goal Progress
@@ -153,7 +158,10 @@ function getChangeClass(index: number): string {
         </Card>
 
         <!-- Weight Chart -->
-        <Card class="animate-card-enter shadow-warm lg:col-span-2" style="animation-delay: 100ms">
+        <Card
+          class="animate-card-enter rounded-[1.8rem] shadow-warm-lg lg:col-span-2"
+          style="animation-delay: 100ms"
+        >
           <CardContent class="pt-6">
             <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
               <h3 class="font-bold">Weight Progress</h3>
@@ -170,7 +178,7 @@ function getChangeClass(index: number): string {
       <!-- Recent Logs Table -->
       <Card
         v-if="store.isSynced"
-        class="animate-card-enter shadow-warm"
+        class="animate-card-enter rounded-[1.8rem] shadow-warm-lg"
         style="animation-delay: 150ms"
       >
         <CardContent class="pt-6">

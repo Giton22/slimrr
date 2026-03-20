@@ -68,6 +68,15 @@ export interface Goal {
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 export type FoodSource = 'manual' | 'openfoodfacts' | 'nutrition_label'
+export type FoodDashboardTab = 'frequent' | 'recent' | 'favorites'
+export type FoodSearchSource =
+  | 'personal'
+  | 'openfoodfacts'
+  | 'recent'
+  | 'favorite'
+  | 'frequent'
+  | 'barcode'
+  | 'ai'
 
 export interface FoodItem {
   id: string
@@ -95,6 +104,32 @@ export interface FoodLogEntry {
   carbs?: number
   fat?: number
   note?: string
+}
+
+export interface FoodFavorite {
+  id: string
+  foodItem: string
+  created: string
+}
+
+export interface FoodRecent {
+  id: string
+  foodItem: string
+  lastLoggedAt: string
+  lastLoggedDate: string
+  lastMealType: MealType
+  lastAmountG: number
+  timesLogged: number
+}
+
+export interface FoodFrequent {
+  id: string
+  foodItem: string
+  lastLoggedAt: string
+  lastLoggedDate: string
+  lastMealType: MealType
+  lastAmountG: number
+  timesLogged: number
 }
 
 export interface DailyFoodSummary {

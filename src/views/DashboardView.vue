@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useWeightStore } from '@/stores/weight'
 import { useFoodStore } from '@/stores/food'
 import { today } from '@/composables/useToday'
@@ -10,7 +10,6 @@ import { addDays, formatDateLong, formatDateShort } from '@/lib/date'
 import type { FoodLogEntry, MealType, WeightEntry } from '@/types'
 import DashboardSkeleton from '@/components/dashboard/skeletons/DashboardSkeleton.vue'
 import StreakCard from '@/components/dashboard/StreakCard.vue'
-import LogFoodDialog from '@/components/dashboard/food/LogFoodDialog.vue'
 import EditFoodLogDialog from '@/components/dashboard/food/EditFoodLogDialog.vue'
 import DailyFoodBreakdown from '@/components/dashboard/food/DailyFoodBreakdown.vue'
 import LogWeightDialog from '@/components/dashboard/LogWeightDialog.vue'
@@ -22,6 +21,7 @@ import DiaryWeightCard from '@/components/dashboard/diary/DiaryWeightCard.vue'
 
 const weightStore = useWeightStore()
 const foodStore = useFoodStore()
+const router = useRouter()
 const { format } = useUnits()
 
 const selectedDate = ref(today.value)
@@ -95,8 +95,6 @@ const selectedWeightLabel = computed(() => {
   return `For ${formatDateShort(selectedDate.value)}`
 })
 
-const logFoodOpen = ref(false)
-const logFoodInitialMeal = ref<MealType | undefined>(undefined)
 const editFoodOpen = ref(false)
 const editingFoodEntry = ref<FoodLogEntry | null>(null)
 const foodBreakdownOpen = ref(false)
@@ -105,19 +103,18 @@ const logWeightOpen = ref(false)
 const editWeightOpen = ref(false)
 
 function openAddFood(mealType: MealType) {
-  logFoodInitialMeal.value = mealType
-  logFoodOpen.value = true
+  void router.push({
+    path: '/nutrition',
+    query: {
+      date: selectedDate.value,
+      meal: mealType,
+      source: 'diary',
+    },
+  })
 }
 
 function openMealBreakdown() {
   foodBreakdownOpen.value = true
-}
-
-function onLogFoodClosed(isOpen: boolean) {
-  logFoodOpen.value = isOpen
-  if (!isOpen) {
-    logFoodInitialMeal.value = undefined
-  }
 }
 
 function openEditFood(entry: FoodLogEntry) {
@@ -261,15 +258,6 @@ const macroGoals = computed(() => ({
         </div>
       </template>
     </div>
-
-    <LogFoodDialog
-      :open="logFoodOpen"
-      :initial-date="selectedDate"
-      :initial-meal-type="logFoodInitialMeal"
-      hide-trigger
-      @update:open="onLogFoodClosed"
-    />
-
     <EditFoodLogDialog v-model:open="editFoodOpen" :entry="editingFoodEntry" />
 
     <DailyFoodBreakdown

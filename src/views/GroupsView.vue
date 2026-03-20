@@ -124,13 +124,17 @@ const cardColors = [
 </script>
 
 <template>
-  <div class="p-4 lg:p-8">
+  <div class="min-h-full px-3 pb-20 pt-3 sm:px-4 sm:pt-4 lg:px-8 lg:pb-8 lg:pt-8">
     <div class="mx-auto max-w-[1200px]">
-      <!-- Header -->
-      <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 class="text-2xl font-black tracking-tight lg:text-4xl">Community Groups</h2>
-          <p class="mt-1 text-muted-foreground">
+          <p class="text-sm font-medium uppercase tracking-[0.22em] text-primary/80">
+            Social Progress
+          </p>
+          <h1 class="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+            Groups
+          </h1>
+          <p class="mt-2 text-sm text-muted-foreground">
             Manage your teams and participate in group challenges.
           </p>
         </div>
@@ -163,7 +167,7 @@ const cardColors = [
       </div>
 
       <!-- Mobile: invite code input -->
-      <Card class="mb-6 border-primary/20 lg:hidden">
+      <Card class="mb-6 rounded-[1.8rem] border-primary/20 shadow-warm-lg lg:hidden">
         <CardContent class="space-y-3 pt-4">
           <p class="text-sm font-medium text-muted-foreground">Enter 8-character invite code</p>
           <form class="space-y-3" @submit.prevent="submitInviteCode">
@@ -198,12 +202,12 @@ const cardColors = [
 
       <!-- Group grid -->
       <div v-else-if="store.myGroups.length > 0">
-        <h3 class="mb-6 text-xl font-bold">Your Groups</h3>
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <h3 class="mb-5 text-sm font-bold uppercase tracking-[0.2em] text-primary">Your Groups</h3>
+        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           <Card
             v-for="(group, i) in visibleGroups"
             :key="group.id"
-            class="cursor-pointer rounded-2xl border transition-all duration-200 hover:border-primary/50 hover:-translate-y-0.5"
+            class="cursor-pointer rounded-[1.8rem] border shadow-warm-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50"
             @click="router.push(`/groups/${group.id}`)"
           >
             <CardContent class="pt-6">
@@ -234,7 +238,10 @@ const cardColors = [
       </div>
 
       <!-- Empty state -->
-      <div v-else class="flex flex-col items-center justify-center py-16 text-center">
+      <div
+        v-else
+        class="flex flex-col items-center justify-center rounded-[1.8rem] border border-dashed border-border bg-card/50 py-16 text-center"
+      >
         <Icon icon="lucide:users" class="mb-4 size-12 text-muted-foreground/50" />
         <h3 class="text-lg font-medium">No groups yet</h3>
         <p class="mb-4 mt-1 text-sm text-muted-foreground">

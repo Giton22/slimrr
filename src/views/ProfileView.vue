@@ -256,10 +256,12 @@ function scrollToSection(id: string) {
 </script>
 
 <template>
-  <div class="p-4 lg:p-0">
-    <div class="mx-auto flex max-w-4xl flex-col lg:flex-row lg:min-h-screen">
+  <div class="min-h-full px-3 pb-20 pt-3 sm:px-4 sm:pt-4 lg:px-8 lg:pb-8 lg:pt-8">
+    <div class="mx-auto flex max-w-6xl flex-col gap-6 lg:min-h-full lg:flex-row">
       <!-- Desktop sub-nav sidebar -->
-      <aside class="hidden w-72 shrink-0 flex-col border-r border-border p-6 lg:flex">
+      <aside
+        class="hidden w-72 shrink-0 flex-col rounded-[1.8rem] border border-border bg-card/70 p-6 shadow-warm-lg lg:flex"
+      >
         <div class="mb-6 flex items-center gap-3">
           <div class="flex size-12 items-center justify-center rounded-full bg-muted">
             <Icon icon="lucide:user" class="size-6 text-muted-foreground" />
@@ -299,12 +301,16 @@ function scrollToSection(id: string) {
       </aside>
 
       <!-- Main content -->
-      <main class="flex-1 lg:overflow-y-auto lg:px-8 lg:py-10">
+      <main class="flex-1 lg:overflow-y-auto lg:px-2">
         <div class="max-w-2xl space-y-8">
-          <!-- Heading -->
-          <header class="hidden lg:block">
-            <h2 class="text-4xl font-black tracking-tight">Settings & Profile</h2>
-            <p class="mt-2 text-lg text-muted-foreground">
+          <header>
+            <p class="text-sm font-medium uppercase tracking-[0.22em] text-primary/80">
+              Account Settings
+            </p>
+            <h1 class="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+              Profile
+            </h1>
+            <p class="mt-2 text-sm text-muted-foreground">
               Manage your body information, app preferences, and data.
             </p>
           </header>
@@ -328,7 +334,7 @@ function scrollToSection(id: string) {
             </div>
 
             <!-- Desktop: profile card -->
-            <Card class="hidden shadow-warm lg:block">
+            <Card class="hidden rounded-[1.8rem] shadow-warm-lg lg:block">
               <CardContent class="flex items-center justify-between gap-6 pt-6">
                 <div class="flex items-center gap-6">
                   <div
@@ -350,7 +356,7 @@ function scrollToSection(id: string) {
           </section>
 
           <!-- BMI Gauge -->
-          <Card class="shadow-warm">
+          <Card class="rounded-[1.8rem] shadow-warm-lg">
             <CardContent class="flex flex-col items-center pt-6">
               <h3
                 class="mb-6 text-center text-sm font-semibold uppercase tracking-wider text-muted-foreground"
@@ -367,7 +373,7 @@ function scrollToSection(id: string) {
               <Icon icon="lucide:activity" class="size-5 text-primary" />
               Body Information
             </h3>
-            <Card class="shadow-warm">
+            <Card class="rounded-[1.8rem] shadow-warm-lg">
               <CardContent class="pt-6">
                 <form class="grid gap-5" @submit.prevent="saveSettings">
                   <div class="grid gap-1.5">
@@ -483,7 +489,7 @@ function scrollToSection(id: string) {
               <Icon icon="lucide:utensils-crossed" class="size-5 text-primary" />
               Nutrition Goals
             </h3>
-            <Card class="shadow-warm">
+            <Card class="rounded-[1.8rem] shadow-warm-lg">
               <CardContent class="pt-6">
                 <div class="mb-5">
                   <p class="font-bold">Daily Macro Targets</p>
@@ -551,7 +557,7 @@ function scrollToSection(id: string) {
               <Icon icon="lucide:sliders-horizontal" class="size-5 text-primary" />
               Preferences
             </h3>
-            <Card class="shadow-warm">
+            <Card class="rounded-[1.8rem] shadow-warm-lg">
               <CardContent class="space-y-6 pt-6">
                 <!-- Unit system -->
                 <div class="flex items-center justify-between">

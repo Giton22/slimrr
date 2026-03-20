@@ -44,6 +44,7 @@ watch(
       await groupsStore.loadMyGroups()
     } else {
       weightStore.reset()
+      foodStore.reset()
       groupsStore.reset()
     }
   },

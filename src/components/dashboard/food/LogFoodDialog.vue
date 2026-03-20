@@ -229,12 +229,12 @@ async function save(addAnother: boolean) {
       })
     }
 
-    await foodStore.logFood(
-      date.value,
-      mealType.value,
+    await foodStore.logFood({
+      date: date.value,
+      mealType: mealType.value,
       foodItem,
-      Math.round(amountField.numericValue.value!),
-    )
+      amountG: Math.round(amountField.numericValue.value!),
+    })
 
     haptics.success()
     toast.success(`Logged ${activeFoodName.value}`)

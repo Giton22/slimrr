@@ -6,15 +6,8 @@ const route = useRoute()
 </script>
 
 <template>
-  <div class="p-4 lg:p-8">
+  <div class="min-h-full px-3 pb-20 pt-3 sm:px-4 sm:pt-4 lg:px-8 lg:pb-8 lg:pt-8">
     <div class="mx-auto max-w-7xl">
-      <!-- Desktop heading -->
-      <div class="mb-6 hidden lg:block">
-        <h2 class="text-3xl font-black tracking-tight">Nutrition Overview</h2>
-        <p class="text-muted-foreground">Calorie history, trends, and daily breakdown.</p>
-      </div>
-
-      <!-- Tab navigation -->
       <div class="mb-6 flex gap-4 border-b border-border">
         <RouterLink
           to="/nutrition"
@@ -38,6 +31,18 @@ const route = useRoute()
         >
           Overview
         </RouterLink>
+      </div>
+
+      <div class="mb-5">
+        <p class="text-sm font-medium uppercase tracking-[0.22em] text-primary/80">
+          Nutrition Analytics
+        </p>
+        <h1 class="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+          Overview
+        </h1>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Calorie history, trends, and daily breakdown.
+        </p>
       </div>
 
       <KcalSection />

@@ -115,7 +115,7 @@ async function handleLeave() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-6">
+  <div class="mx-auto max-w-5xl space-y-6 px-3 pb-20 pt-3 sm:px-4 sm:pt-4 lg:px-8 lg:pb-8 lg:pt-8">
     <!-- Loading skeleton -->
     <div v-if="store.isLoading && !store.currentGroup" class="space-y-6">
       <Skeleton class="h-8 w-24" />
@@ -162,7 +162,12 @@ async function handleLeave() {
 
         <div class="flex items-start justify-between gap-4">
           <div class="space-y-1">
-            <h2 class="text-2xl font-bold tracking-tight">{{ store.currentGroup.name }}</h2>
+            <p class="text-sm font-medium uppercase tracking-[0.22em] text-primary/80">
+              Group Space
+            </p>
+            <h1 class="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+              {{ store.currentGroup.name }}
+            </h1>
             <p v-if="store.currentGroup.description" class="text-sm text-muted-foreground">
               {{ store.currentGroup.description }}
             </p>
@@ -175,7 +180,7 @@ async function handleLeave() {
         </div>
 
         <!-- Invite code -->
-        <Card class="shadow-warm">
+        <Card class="rounded-[1.8rem] shadow-warm-lg">
           <CardContent class="flex items-center justify-between py-3">
             <div class="space-y-0.5">
               <p class="text-xs text-muted-foreground">Invite Code</p>
@@ -191,11 +196,11 @@ async function handleLeave() {
         </Card>
       </div>
 
-      <Separator />
+      <Separator class="opacity-50" />
 
       <!-- Members section -->
       <div class="space-y-4">
-        <h3 class="text-lg font-semibold">Members</h3>
+        <h3 class="text-sm font-bold uppercase tracking-[0.2em] text-primary">Members</h3>
         <div class="space-y-6">
           <MemberGoalsList
             v-for="member in visibleMembers"
@@ -212,7 +217,7 @@ async function handleLeave() {
         </div>
       </div>
 
-      <Separator />
+      <Separator class="opacity-50" />
 
       <!-- Leave / Delete -->
       <div class="flex justify-end">
@@ -233,7 +238,10 @@ async function handleLeave() {
     </template>
 
     <!-- Not found -->
-    <div v-else class="flex flex-col items-center justify-center py-16 text-center">
+    <div
+      v-else
+      class="flex flex-col items-center justify-center rounded-[1.8rem] border border-dashed border-border bg-card/50 py-16 text-center"
+    >
       <Icon icon="lucide:alert-circle" class="h-12 w-12 text-muted-foreground/50 mb-4" />
       <h3 class="text-lg font-medium">Group not found</h3>
       <p class="text-sm text-muted-foreground mt-1 mb-4">

@@ -100,6 +100,31 @@ export interface FoodLogRecord extends RecordModel {
   note: string
 }
 
+export interface FoodFavoriteRecord extends RecordModel {
+  user: string
+  food_item: string
+}
+
+export interface FoodRecentRecord extends RecordModel {
+  user: string
+  food_item: string
+  last_logged_at: string
+  last_logged_date: string
+  last_meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  last_amount_g: number
+  times_logged: number
+}
+
+export interface FoodFrequentRecord extends RecordModel {
+  user: string
+  food_item: string
+  last_logged_at: string
+  last_logged_date: string
+  last_meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  last_amount_g: number
+  times_logged: number
+}
+
 export interface GoalRecord extends RecordModel {
   user: string
   title: string
@@ -124,4 +149,7 @@ export const COLLECTIONS = {
   GOALS: 'goals',
   FOOD_ITEMS: 'food_items',
   FOOD_LOG: 'food_log',
+  FOOD_FAVORITES: 'food_favorites',
+  FOOD_RECENTS: 'food_recents',
+  FOOD_FREQUENT: 'food_frequent',
 } as const

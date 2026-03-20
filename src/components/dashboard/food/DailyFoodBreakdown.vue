@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import type { FoodLogEntry, MealType, DailyFoodSummary } from '@/types'
 import { useFoodStore } from '@/stores/food'
@@ -26,6 +27,7 @@ defineEmits<{
 }>()
 
 const foodStore = useFoodStore()
+const router = useRouter()
 
 const summary = computed((): DailyFoodSummary | null => {
   if (!props.date) return null
@@ -57,7 +59,11 @@ async function duplicateEntry(entry: FoodLogEntry) {
       ? (foodStore.foodItems.find((item) => item.id === entry.foodItem) ?? null)
       : null
 
-    await foodStore.logFood(entry.date, entry.mealType, matchedFood, entry.amountG, {
+    await foodStore.logFood({
+      date: entry.date,
+      mealType: entry.mealType,
+      foodItem: matchedFood,
+      amountG: entry.amountG,
       calories: entry.calories,
       protein: entry.protein ?? 0,
       carbs: entry.carbs ?? 0,
@@ -69,6 +75,18 @@ async function duplicateEntry(entry: FoodLogEntry) {
   } catch {
     toast.error('Failed to duplicate entry')
   }
+}
+
+function routeToMeal(mealType: MealType) {
+  if (!props.date) return
+  void router.push({
+    path: '/nutrition',
+    query: {
+      date: props.date,
+      meal: mealType,
+      source: 'diary',
+    },
+  })
 }
 </script>
 
@@ -90,7 +108,7 @@ async function duplicateEntry(entry: FoodLogEntry) {
             :meal-type="mt"
             :entries="summary.meals[mt]"
             @edit-entry="openEditEntry"
-            @add-food="$emit('addFood', $event)"
+            @add-food="routeToMeal"
             @delete-entry="deleteEntry"
             @duplicate-entry="duplicateEntry"
           />

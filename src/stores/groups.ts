@@ -63,6 +63,20 @@ function generateInviteCode(): string {
   return code
 }
 
+function isNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as {
+    status?: number
+    message?: string
+    originalError?: { message?: string }
+  }
+  return (
+    candidate.status === 404 ||
+    candidate.message?.includes('not found') === true ||
+    candidate.originalError?.message?.includes('no rows in result set') === true
+  )
+}
+
 // ── Store ──
 
 export const useGroupsStore = defineStore('groups', () => {
@@ -263,18 +277,27 @@ export const useGroupsStore = defineStore('groups', () => {
       }
 
       if (weightGoalId) {
-        const rec = await pb.collection<GoalRecord>(COLLECTIONS.GOALS).update(weightGoalId, payload)
-        const updated = toGoal(rec)
-        const idx = currentGoals.value.findIndex((g) => g.id === weightGoalId)
-        if (idx !== -1) currentGoals.value[idx] = updated
-      } else {
-        const rec = await pb.collection<GoalRecord>(COLLECTIONS.GOALS).create(payload)
-        weightGoalId = rec.id
-        const goal = toGoal(rec)
-        if (!currentGoals.value.some((g) => g.id === goal.id)) {
-          currentGoals.value.unshift(goal)
+        try {
+          const rec = await pb
+            .collection<GoalRecord>(COLLECTIONS.GOALS)
+            .update(weightGoalId, payload)
+          const updated = toGoal(rec)
+          const idx = currentGoals.value.findIndex((g) => g.id === weightGoalId)
+          if (idx !== -1) currentGoals.value[idx] = updated
+          return
+        } catch (error) {
+          if (!isNotFoundError(error)) throw error
+          currentGoals.value = currentGoals.value.filter((g) => g.id !== weightGoalId)
+          weightGoalId = null
         }
+      } else {
+        // fall through to create below
       }
+
+      const rec = await pb.collection<GoalRecord>(COLLECTIONS.GOALS).create(payload)
+      weightGoalId = rec.id
+      const goal = toGoal(rec)
+      currentGoals.value = [goal, ...currentGoals.value.filter((g) => g.id !== goal.id)]
     } catch (e) {
       console.warn('[syncWeightGoal] Failed:', e)
     }
