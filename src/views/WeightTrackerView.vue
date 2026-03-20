@@ -12,6 +12,7 @@ import AverageModeToggle from '@/components/dashboard/AverageModeToggle.vue'
 import LogWeightDialog from '@/components/dashboard/LogWeightDialog.vue'
 import EditWeightDialog from '@/components/dashboard/EditWeightDialog.vue'
 import type { WeightEntry } from '@/types'
+import WeightTrackerSkeleton from '@/components/dashboard/skeletons/WeightTrackerSkeleton.vue'
 
 const store = useWeightStore()
 const { format, formatDelta, convert } = useUnits()
@@ -79,8 +80,11 @@ function getChangeClass(index: number): string {
         </p>
       </div>
 
+      <!-- Skeleton loading state -->
+      <WeightTrackerSkeleton v-if="!store.isSynced" />
+
       <!-- Hero: current weight + log button -->
-      <Card class="animate-card-enter shadow-warm">
+      <Card v-if="store.isSynced" class="animate-card-enter shadow-warm">
         <CardContent
           class="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between"
         >
@@ -110,9 +114,9 @@ function getChangeClass(index: number): string {
               </div>
               <p class="mt-1 text-xs text-muted-foreground">
                 Goal: {{ format(store.settings.goalWeightKg) }}
-                <template v-if="store.currentWeight">
+                <span v-if="store.currentWeight">
                   ({{ format(Math.abs(store.currentWeight - store.settings.goalWeightKg)) }} to go)
-                </template>
+                </span>
               </p>
             </div>
           </div>
@@ -124,7 +128,7 @@ function getChangeClass(index: number): string {
       </Card>
 
       <!-- Grid: Goal Progress + Chart -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div v-if="store.isSynced" class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <!-- Goal Progress (desktop sidebar) -->
         <Card class="animate-card-enter shadow-warm lg:col-span-1" style="animation-delay: 50ms">
           <CardContent class="pt-6">
@@ -159,7 +163,11 @@ function getChangeClass(index: number): string {
       </div>
 
       <!-- Recent Logs Table -->
-      <Card class="animate-card-enter shadow-warm" style="animation-delay: 150ms">
+      <Card
+        v-if="store.isSynced"
+        class="animate-card-enter shadow-warm"
+        style="animation-delay: 150ms"
+      >
         <CardContent class="pt-6">
           <div class="mb-4 flex items-center justify-between">
             <h3 class="font-bold">Recent Logs</h3>

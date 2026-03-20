@@ -1,5 +1,5 @@
 # ── Stage 1: Build the frontend ──────────────────────────────────────────────
-FROM node:22-bookworm-slim AS frontend
+FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
@@ -11,7 +11,8 @@ RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Install all dependencies (including devDependencies needed for build).
 # Skip git hook setup in container builds.
-RUN VITE_GIT_HOOKS=0 HUSKY=0 pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    VITE_GIT_HOOKS=0 HUSKY=0 pnpm install --frozen-lockfile
 
 # Copy the rest of the source
 COPY . .
@@ -28,7 +29,8 @@ WORKDIR /build
 
 # Copy Go module files first for layer caching
 COPY backend/go.mod backend/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy backend source
 COPY backend/ .
@@ -37,7 +39,9 @@ COPY backend/ .
 COPY --from=frontend /app/dist ./pb/pb_public/
 
 # Build static binary
-RUN CGO_ENABLED=0 go build -o slimrr .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -o slimrr .
 
 # ── Stage 3: Runtime ────────────────────────────────────────────────────────
 FROM alpine:3

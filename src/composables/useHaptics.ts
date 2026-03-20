@@ -12,5 +12,6 @@ export function useHaptics() {
     success: () => vibrate(50),
     error: () => vibrate([50, 50, 50]),
     light: () => vibrate(10),
+    tick: () => vibrate(5),
   }
 }

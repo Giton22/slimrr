@@ -10,6 +10,8 @@ import CaloriesDonutChart from '@/components/dashboard/CaloriesDonutChart.vue'
 import MacroProgressBars from '@/components/dashboard/MacroProgressBars.vue'
 import WeightTrendBarChart from '@/components/dashboard/WeightTrendBarChart.vue'
 import WeightGoalSummary from '@/components/dashboard/WeightGoalSummary.vue'
+import DashboardSkeleton from '@/components/dashboard/skeletons/DashboardSkeleton.vue'
+import StreakCard from '@/components/dashboard/StreakCard.vue'
 
 const weightStore = useWeightStore()
 const foodStore = useFoodStore()
@@ -58,8 +60,14 @@ const { pullDistance, isRefreshing } = usePullToRefresh(containerRef, {
         <p class="text-muted-foreground">Welcome back! Here's your health overview for today.</p>
       </div>
 
+      <!-- Skeleton loading state -->
+      <DashboardSkeleton v-if="!weightStore.isSynced" />
+
+      <!-- Streak -->
+      <StreakCard v-if="weightStore.isSynced" />
+
       <!-- Top Row: BMI | Macros + Calories Donut -->
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+      <div v-if="weightStore.isSynced" class="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
         <!-- BMI Gauge Card -->
         <Card class="animate-card-enter shadow-warm">
           <CardContent class="flex flex-col items-center justify-between pt-6">
@@ -120,7 +128,11 @@ const { pullDistance, isRefreshing } = usePullToRefresh(containerRef, {
       </div>
 
       <!-- Weight Trend Bar Chart -->
-      <Card class="animate-card-enter shadow-warm" style="animation-delay: 100ms">
+      <Card
+        v-if="weightStore.isSynced"
+        class="animate-card-enter shadow-warm"
+        style="animation-delay: 100ms"
+      >
         <CardContent class="pt-6">
           <WeightTrendBarChart />
           <WeightGoalSummary class="mt-6" />

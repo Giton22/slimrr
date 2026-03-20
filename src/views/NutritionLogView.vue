@@ -7,6 +7,7 @@ import { useWeightStore } from '@/stores/weight'
 import { useFoodStore } from '@/stores/food'
 import { today } from '@/composables/useToday'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
+import { useSwipeDayNavigation } from '@/composables/useSwipeDayNavigation'
 import { addDays, formatDateShort } from '@/lib/date'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,8 +20,11 @@ import QuickLogDialog from '@/components/dashboard/food/QuickLogDialog.vue'
 import BarcodeScannerDialog from '@/components/dashboard/food/BarcodeScannerDialog.vue'
 import NutritionLabelDialog from '@/components/dashboard/food/NutritionLabelDialog.vue'
 import type { FoodLogEntry, MealType } from '@/types'
+import NutritionLogSkeleton from '@/components/dashboard/skeletons/NutritionLogSkeleton.vue'
 
 const route = useRoute()
+
+const showSkeleton = computed(() => foodStore.isLoading && foodStore.foodLog.length === 0)
 const weightStore = useWeightStore()
 const foodStore = useFoodStore()
 
@@ -156,6 +160,19 @@ const { pullDistance, isRefreshing } = usePullToRefresh(containerRef, {
   },
 })
 
+// Swipe between days
+const swipeDirection = ref<'left' | 'right' | null>(null)
+const { offsetX, onTouchStart, onTouchMove, onTouchEnd } = useSwipeDayNavigation(containerRef, {
+  onPrev() {
+    swipeDirection.value = 'right'
+    prevDay()
+  },
+  onNext() {
+    swipeDirection.value = 'left'
+    nextDay()
+  },
+})
+
 // Recent food items (from food log, deduplicated by name)
 const recentFoods = computed(() => {
   const seen = new Set<string>()
@@ -225,8 +242,11 @@ const recentFoods = computed(() => {
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
         <!-- Main column -->
         <div class="space-y-6 lg:col-span-8">
+          <!-- Skeleton loading state -->
+          <NutritionLogSkeleton v-if="showSkeleton" />
+
           <!-- Date Navigator -->
-          <div class="flex items-center justify-center gap-3">
+          <div v-if="!showSkeleton" class="flex items-center justify-center gap-3">
             <Button variant="ghost" size="icon" class="size-11" @click="prevDay">
               <Icon icon="lucide:chevron-left" class="size-5" />
             </Button>
@@ -251,121 +271,148 @@ const recentFoods = computed(() => {
             </Button>
           </div>
 
-          <!-- Summary Card -->
-          <Card class="animate-card-enter shadow-warm">
-            <CardContent class="space-y-4 pt-6">
-              <CaloriesRingProgress :consumed="consumed" :goal="goal" />
-              <div class="grid grid-cols-3 gap-2 border-t border-border pt-4">
-                <div class="text-center">
-                  <p class="text-xs uppercase tracking-wider text-muted-foreground">Goal</p>
-                  <p class="font-bold">{{ goal.toLocaleString() }}</p>
-                </div>
-                <div class="text-center">
-                  <p class="text-xs uppercase tracking-wider text-muted-foreground">Food</p>
-                  <p class="font-bold">{{ consumed.toLocaleString() }}</p>
-                </div>
-                <div class="text-center">
-                  <p class="text-xs uppercase tracking-wider text-muted-foreground">Remaining</p>
-                  <p class="font-bold">{{ Math.max(0, goal - consumed).toLocaleString() }}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <!-- Macro cards (mobile) / stat cards (desktop) -->
-          <div class="grid grid-cols-3 gap-3 lg:grid-cols-4">
-            <Card class="animate-card-enter" style="animation-delay: 50ms">
-              <CardContent class="p-3 lg:p-5">
-                <p class="text-[10px] font-bold uppercase text-muted-foreground">Protein</p>
-                <p class="text-sm font-bold lg:text-2xl">{{ dayMacros.protein }}g</p>
-                <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    class="h-full rounded-full bg-primary"
-                    :style="{ width: `${Math.min(100, (dayMacros.protein / 150) * 100)}%` }"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <Card class="animate-card-enter" style="animation-delay: 75ms">
-              <CardContent class="p-3 lg:p-5">
-                <p class="text-[10px] font-bold uppercase text-muted-foreground">Carbs</p>
-                <p class="text-sm font-bold lg:text-2xl">{{ dayMacros.carbs }}g</p>
-                <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    class="h-full rounded-full bg-orange-400"
-                    :style="{ width: `${Math.min(100, (dayMacros.carbs / 250) * 100)}%` }"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <Card class="animate-card-enter" style="animation-delay: 100ms">
-              <CardContent class="p-3 lg:p-5">
-                <p class="text-[10px] font-bold uppercase text-muted-foreground">Fat</p>
-                <p class="text-sm font-bold lg:text-2xl">{{ dayMacros.fat }}g</p>
-                <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    class="h-full rounded-full bg-purple-400"
-                    :style="{ width: `${Math.min(100, (dayMacros.fat / 65) * 100)}%` }"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <!-- Remaining kcal card (desktop only) -->
-            <Card class="animate-card-enter hidden lg:block" style="animation-delay: 125ms">
-              <CardContent class="p-5">
-                <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Remaining
-                </p>
-                <p class="text-2xl font-bold text-primary">
-                  {{ Math.max(0, goal - consumed).toLocaleString() }}
-                </p>
-                <p class="mt-1 text-xs text-muted-foreground">kcal left</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <!-- Quick Add Bar -->
-          <Card
-            class="animate-card-enter border-2 border-primary/20 shadow-warm"
-            style="animation-delay: 150ms"
+          <!-- Swipeable day content -->
+          <div
+            v-if="!showSkeleton"
+            class="relative min-h-[200px] overflow-hidden"
+            @touchstart.passive="onTouchStart"
+            @touchmove="onTouchMove"
+            @touchend="onTouchEnd"
           >
-            <CardContent class="space-y-4 pt-4">
-              <div class="flex flex-wrap justify-between gap-2">
-                <Button variant="outline" class="flex-1 gap-2" @click="logFoodOpen = true">
-                  <Icon icon="lucide:pencil" class="size-4 text-primary" />
-                  Manual
-                </Button>
-                <Button variant="outline" class="flex-1 gap-2" @click="barcodeOpen = true">
-                  <Icon icon="lucide:scan-barcode" class="size-4 text-primary" />
-                  Barcode
-                </Button>
-                <Button variant="outline" class="flex-1 gap-2" @click="labelScanOpen = true">
-                  <Icon icon="lucide:camera" class="size-4 text-primary" />
-                  AI Scan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <!-- Meal Sections -->
-          <div class="space-y-4">
-            <Card
-              v-for="meal in mealTypes"
-              :key="meal"
-              class="animate-card-enter shadow-warm"
-              :style="{ animationDelay: `${200 + mealTypes.indexOf(meal) * 50}ms` }"
+            <Transition
+              :name="swipeDirection === 'left' ? 'slide-left' : 'slide-right'"
+              mode="out-in"
             >
-              <CardContent class="pt-4">
-                <MealSection
-                  :meal-type="meal"
-                  :entries="entriesForMeal(meal)"
-                  @add-food="openAddFood"
-                  @edit-entry="openEditFood"
-                  @delete-entry="deleteEntry"
-                  @duplicate-entry="duplicateEntry"
-                />
-              </CardContent>
-            </Card>
+              <div
+                :key="selectedDate"
+                class="space-y-6"
+                :style="{
+                  transform: offsetX ? `translateX(${offsetX}px)` : undefined,
+                  transition: offsetX ? 'none' : undefined,
+                }"
+              >
+                <!-- Summary Card -->
+                <Card class="animate-card-enter shadow-warm">
+                  <CardContent class="space-y-4 pt-6">
+                    <CaloriesRingProgress :consumed="consumed" :goal="goal" />
+                    <div class="grid grid-cols-3 gap-2 border-t border-border pt-4">
+                      <div class="text-center">
+                        <p class="text-xs uppercase tracking-wider text-muted-foreground">Goal</p>
+                        <p class="font-bold">{{ goal.toLocaleString() }}</p>
+                      </div>
+                      <div class="text-center">
+                        <p class="text-xs uppercase tracking-wider text-muted-foreground">Food</p>
+                        <p class="font-bold">{{ consumed.toLocaleString() }}</p>
+                      </div>
+                      <div class="text-center">
+                        <p class="text-xs uppercase tracking-wider text-muted-foreground">
+                          Remaining
+                        </p>
+                        <p class="font-bold">{{ Math.max(0, goal - consumed).toLocaleString() }}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <!-- Macro cards (mobile) / stat cards (desktop) -->
+                <div class="grid grid-cols-3 gap-3 lg:grid-cols-4">
+                  <Card class="animate-card-enter" style="animation-delay: 50ms">
+                    <CardContent class="p-3 lg:p-5">
+                      <p class="text-[10px] font-bold uppercase text-muted-foreground">Protein</p>
+                      <p class="text-sm font-bold lg:text-2xl">{{ dayMacros.protein }}g</p>
+                      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          class="h-full rounded-full bg-primary"
+                          :style="{ width: `${Math.min(100, (dayMacros.protein / 150) * 100)}%` }"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card class="animate-card-enter" style="animation-delay: 75ms">
+                    <CardContent class="p-3 lg:p-5">
+                      <p class="text-[10px] font-bold uppercase text-muted-foreground">Carbs</p>
+                      <p class="text-sm font-bold lg:text-2xl">{{ dayMacros.carbs }}g</p>
+                      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          class="h-full rounded-full bg-orange-400"
+                          :style="{ width: `${Math.min(100, (dayMacros.carbs / 250) * 100)}%` }"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card class="animate-card-enter" style="animation-delay: 100ms">
+                    <CardContent class="p-3 lg:p-5">
+                      <p class="text-[10px] font-bold uppercase text-muted-foreground">Fat</p>
+                      <p class="text-sm font-bold lg:text-2xl">{{ dayMacros.fat }}g</p>
+                      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          class="h-full rounded-full bg-purple-400"
+                          :style="{ width: `${Math.min(100, (dayMacros.fat / 65) * 100)}%` }"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <!-- Remaining kcal card (desktop only) -->
+                  <Card class="animate-card-enter hidden lg:block" style="animation-delay: 125ms">
+                    <CardContent class="p-5">
+                      <p
+                        class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                      >
+                        Remaining
+                      </p>
+                      <p class="text-2xl font-bold text-primary">
+                        {{ Math.max(0, goal - consumed).toLocaleString() }}
+                      </p>
+                      <p class="mt-1 text-xs text-muted-foreground">kcal left</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <!-- Quick Add Bar -->
+                <Card
+                  class="animate-card-enter border-2 border-primary/20 shadow-warm"
+                  style="animation-delay: 150ms"
+                >
+                  <CardContent class="space-y-4 pt-4">
+                    <div class="flex flex-wrap justify-between gap-2">
+                      <Button variant="outline" class="flex-1 gap-2" @click="logFoodOpen = true">
+                        <Icon icon="lucide:pencil" class="size-4 text-primary" />
+                        Manual
+                      </Button>
+                      <Button variant="outline" class="flex-1 gap-2" @click="barcodeOpen = true">
+                        <Icon icon="lucide:scan-barcode" class="size-4 text-primary" />
+                        Barcode
+                      </Button>
+                      <Button variant="outline" class="flex-1 gap-2" @click="labelScanOpen = true">
+                        <Icon icon="lucide:camera" class="size-4 text-primary" />
+                        AI Scan
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <!-- Meal Sections -->
+                <div class="space-y-4">
+                  <Card
+                    v-for="meal in mealTypes"
+                    :key="meal"
+                    class="animate-card-enter shadow-warm"
+                    :style="{ animationDelay: `${200 + mealTypes.indexOf(meal) * 50}ms` }"
+                  >
+                    <CardContent class="pt-4">
+                      <MealSection
+                        :meal-type="meal"
+                        :entries="entriesForMeal(meal)"
+                        @add-food="openAddFood"
+                        @edit-entry="openEditFood"
+                        @delete-entry="deleteEntry"
+                        @duplicate-entry="duplicateEntry"
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </Transition>
           </div>
         </div>
 

@@ -7,6 +7,8 @@ import { useUnits } from '@/composables/useUnits'
 import { useNumericField } from '@/composables/useNumericField'
 import { useHaptics } from '@/composables/useHaptics'
 import { todayISO } from '@/lib/date'
+import { useIsMobile } from '@/components/ui/responsive-dialog/useIsMobile'
+import { WeightScrollPicker } from '@/components/ui/scroll-picker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,6 +30,7 @@ const store = useWeightStore()
 const { isKg, convert, toKg } = useUnits()
 const haptics = useHaptics()
 
+const isMobile = useIsMobile()
 const open = defineModel<boolean>('open', { default: false })
 const date = ref(todayISO())
 const weightField = useNumericField({ min: 1, required: true })
@@ -115,9 +118,17 @@ async function submit() {
           <Input id="date" v-model="date" type="date" />
           <p v-if="isUpdating" class="text-xs text-warning">Updating existing entry</p>
         </div>
-        <div class="grid gap-2">
+        <div class="grid gap-2" data-vaul-no-drag>
           <Label for="weight">Weight ({{ isKg ? 'kg' : 'lbs' }})</Label>
+          <!-- Mobile: scroll wheel picker -->
+          <WeightScrollPicker
+            v-if="isMobile"
+            :model-value="weightField.displayValue.value || (isKg ? '70.0' : '154.0')"
+            @update:model-value="weightField.displayValue.value = $event"
+          />
+          <!-- Desktop: numeric input -->
           <Input
+            v-else
             id="weight"
             ref="weightInputRef"
             v-model="weightField.displayValue.value"

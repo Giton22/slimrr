@@ -702,3 +702,97 @@
 .animate-shake {
   animation: shake 0.4s ease-in-out;
 }
+
+/* Shimmer animation for skeleton hero/chart areas */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Streak glow animation */
+@keyframes streak-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 3px oklch(0.3 0.02 55 / 0.08),
+      0 0 0 0 oklch(0.75 0.15 75 / 0);
+  }
+  50% {
+    box-shadow:
+      0 1px 3px oklch(0.3 0.02 55 / 0.08),
+      0 0 12px 4px oklch(0.75 0.15 75 / 0.3);
+  }
+}
+
+.streak-glow {
+  animation: streak-glow 0.75s ease-in-out 2;
+}
+
+/* Streak bump animation */
+@keyframes streak-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.streak-bump {
+  display: inline-block;
+  animation: streak-bump 0.4s ease-out;
+}
+
+/* Day navigation slide transitions */
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-100%);
+}
+
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-100%);
+}
+
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.slide-left-leave-active,
+.slide-right-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    color-mix(in srgb, var(--muted) 60%, var(--background) 40%) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}

@@ -125,6 +125,7 @@ function onTouchEnd(entry: FoodLogEntry) {
 
         <!-- Swipeable entry -->
         <div
+          data-swipe-item
           class="relative flex cursor-pointer items-center justify-between bg-background px-2 py-1.5 text-sm transition-colors hover:bg-muted/50"
           :style="{
             transform: `translateX(${swipeOffsets[entry.id] ?? 0}px)`,

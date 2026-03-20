@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import MemberGoalsList from '@/components/groups/MemberGoalsList.vue'
 
 const route = useRoute()
@@ -115,12 +116,40 @@ async function handleLeave() {
 
 <template>
   <div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-6">
-    <!-- Loading -->
-    <div
-      v-if="store.isLoading && !store.currentGroup"
-      class="flex items-center justify-center py-12"
-    >
-      <Icon icon="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    <!-- Loading skeleton -->
+    <div v-if="store.isLoading && !store.currentGroup" class="space-y-6">
+      <Skeleton class="h-8 w-24" />
+      <div class="flex items-start justify-between gap-4">
+        <div class="space-y-2">
+          <Skeleton class="h-7 w-48" />
+          <Skeleton class="h-4 w-64" />
+        </div>
+        <Skeleton class="h-6 w-20 rounded-full" />
+      </div>
+      <Card class="shadow-warm">
+        <CardContent class="flex items-center justify-between py-3">
+          <div class="space-y-1">
+            <Skeleton class="h-3 w-16" />
+            <Skeleton class="h-6 w-28" />
+          </div>
+          <Skeleton class="h-8 w-16 rounded-md" />
+        </CardContent>
+      </Card>
+      <Separator />
+      <div class="space-y-4">
+        <Skeleton class="h-5 w-20" />
+        <div
+          v-for="i in 3"
+          :key="i"
+          class="flex items-center gap-3 rounded-lg border border-border p-4"
+        >
+          <Skeleton class="size-10 rounded-full" />
+          <div class="space-y-1">
+            <Skeleton class="h-4 w-24" />
+            <Skeleton class="h-3 w-32" />
+          </div>
+        </div>
+      </div>
     </div>
 
     <template v-else-if="store.currentGroup">

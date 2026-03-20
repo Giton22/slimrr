@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+coverage
+
+# Git
+.git
+.gitignore
+
+# Claude / AI
+.claude
+.agents
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# PocketBase data (runtime, not needed for build)
+backend/pb_data
+
+# Cypress / Vitest artifacts
+cypress/videos
+cypress/screenshots
+__screenshots__
+
+# Misc
+*.local
+*.tsbuildinfo
+*.timestamp-*-*.mjs
+stitch

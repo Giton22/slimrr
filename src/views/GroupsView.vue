@@ -6,6 +6,7 @@ import { useGroupsStore } from '@/stores/groups'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import JoinGroupDialog from '@/components/groups/JoinGroupDialog.vue'
 
@@ -142,9 +143,15 @@ const cardColors = [
         </CardContent>
       </Card>
 
-      <!-- Loading -->
-      <div v-if="store.isLoading" class="flex items-center justify-center py-12">
-        <Icon icon="lucide:loader-2" class="size-6 animate-spin text-muted-foreground" />
+      <!-- Loading skeleton -->
+      <div v-if="store.isLoading" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card v-for="i in 6" :key="i" class="rounded-2xl">
+          <CardContent class="pt-6">
+            <Skeleton class="mb-6 size-14 rounded-xl" />
+            <Skeleton class="mb-1 h-5 w-32" />
+            <Skeleton class="mb-6 h-4 w-48" />
+          </CardContent>
+        </Card>
       </div>
 
       <!-- Group grid -->
