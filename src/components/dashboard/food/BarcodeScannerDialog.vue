@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, nextTick } from 'vue'
+import { ref } from 'vue'
+import { QrcodeStream } from 'vue-qrcode-reader'
 import { Icon } from '@iconify/vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,65 +21,22 @@ const emit = defineEmits<{
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
-const scannerRef = ref<HTMLDivElement | null>(null)
 const errorMessage = ref('')
-let scanner: InstanceType<typeof import('html5-qrcode').Html5Qrcode> | null = null
 
-async function startScanner() {
-  errorMessage.value = ''
-  await nextTick()
-
-  if (!scannerRef.value) return
-
-  try {
-    const { Html5Qrcode } = await import('html5-qrcode')
-    scanner = new Html5Qrcode(scannerRef.value.id)
-
-    await scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 150 } },
-      (decodedText: string) => {
-        void stopScanner()
-        open.value = false
-        emit('scanned', decodedText)
-      },
-      () => {
-        // ignore scan failures (no barcode in frame)
-      },
-    )
-  } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Failed to access camera'
+function onDetect(detectedCodes: DetectedBarcode[]) {
+  if (detectedCodes.length > 0) {
+    open.value = false
+    emit('scanned', detectedCodes[0].rawValue)
   }
 }
 
-async function stopScanner() {
-  if (scanner) {
-    try {
-      await scanner.stop()
-      scanner.clear()
-    } catch {
-      // ignore cleanup errors
-    }
-    scanner = null
-  }
+function onError(error: Error) {
+  errorMessage.value = error.message
 }
-
-function onOpenChange(value: boolean) {
-  open.value = value
-  if (value) {
-    void startScanner()
-  } else {
-    void stopScanner()
-  }
-}
-
-onBeforeUnmount(() => {
-  void stopScanner()
-})
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="onOpenChange">
+  <Dialog v-model:open="open">
     <DialogTrigger v-if="!hideTrigger" as-child>
       <Button variant="outline" size="icon" title="Scan barcode">
         <Icon icon="lucide:scan-barcode" class="h-4 w-4" />
@@ -94,10 +52,13 @@ onBeforeUnmount(() => {
       </DialogHeader>
 
       <div class="py-4">
-        <div
-          id="barcode-scanner-region"
-          ref="scannerRef"
-          class="mx-auto aspect-video w-full overflow-hidden rounded-lg bg-muted"
+        <QrcodeStream
+          v-if="open"
+          :formats="['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']"
+          :constraints="{ facingMode: 'environment' }"
+          @detect="onDetect"
+          @error="onError"
+          class="mx-auto aspect-video w-full overflow-hidden rounded-lg"
         />
         <p v-if="errorMessage" class="mt-2 text-center text-sm text-destructive">
           {{ errorMessage }}
