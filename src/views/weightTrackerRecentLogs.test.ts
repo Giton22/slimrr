@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test'
 import {
   formatRecentLogDisplayDiff,
+  getDeleteWeightEntryDescription,
   getRecentLogChangeClass,
   getRecentLogDisplayDiff,
 } from '@/views/weightTrackerRecentLogs'
@@ -45,5 +46,11 @@ describe('weightTrackerRecentLogs', () => {
 
     expect(diff).toBe(0.2)
     expect(formatRecentLogDisplayDiff(diff, 'lbs')).toBe('+0.2 lbs')
+  })
+
+  it('builds a clear delete confirmation message', () => {
+    expect(getDeleteWeightEntryDescription('Sat, Mar 21')).toBe(
+      'Are you sure you want to delete the weight entry for Sat, Mar 21? This action cannot be undone.',
+    )
   })
 })

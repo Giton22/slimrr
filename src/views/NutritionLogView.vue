@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import type { FoodDashboardTab, FoodItem, MealType } from '@/types'
 import { useFoodStore } from '@/stores/food'
-import { parseNutritionRouteContext, mealSearchPlaceholder } from '@/lib/food-dashboard'
+import {
+  buildNutritionRouteQuery,
+  mealLabel,
+  mealSearchPlaceholder,
+  parseNutritionRouteContext,
+} from '@/lib/food-dashboard'
 import FoodLogDashboardHeader from '@/components/nutrition/FoodLogDashboardHeader.vue'
 import FoodDashboardSearchHero from '@/components/nutrition/FoodDashboardSearchHero.vue'
 import FoodDashboardTabs from '@/components/nutrition/FoodDashboardTabs.vue'
@@ -24,7 +29,9 @@ const amountG = ref(100)
 const barcodeDialogOpen = ref(false)
 const labelDialogOpen = ref(false)
 const pendingFavorite = ref(false)
+const saveNotice = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+const feedbackRef = ref<HTMLElement | null>(null)
 
 const showSkeleton = computed(() => foodStore.isLoading && foodStore.foodItems.length === 0)
 
@@ -63,12 +70,11 @@ function syncRouteState() {
 function replaceRouteQuery(source = route.query.source) {
   void router.replace({
     path: '/nutrition',
-    query: {
-      ...route.query,
+    query: buildNutritionRouteQuery({
       date: selectedDate.value,
       meal: selectedMeal.value,
       source: typeof source === 'string' ? source : 'manual',
-    },
+    }),
   })
 }
 
@@ -184,9 +190,15 @@ async function saveFood() {
 
     foodStore.dashboardQuery = ''
     foodStore.searchResults = []
+    saveNotice.value = `Added ${actualFood.name} to ${mealLabel(selectedMeal.value).toLowerCase()} for ${selectedDate.value}.`
     clearComposer()
     replaceRouteQuery('manual')
     toast.success(`Logged ${actualFood.name}`)
+
+    if (route.query.source === 'diary') {
+      await nextTick()
+      feedbackRef.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
   } catch {
     toast.error('Failed to log food')
   } finally {
@@ -222,6 +234,17 @@ watch(
     }, 350)
   },
 )
+
+const mobileSelectionSummary = computed(() => {
+  const selection = foodStore.selectedFoodForLogging
+  if (!selection) return null
+
+  return {
+    title: selection.name,
+    subtitle: `${mealLabel(selectedMeal.value)} · ${selectedDate.value}`,
+    meta: selection.brand || `${selection.defaultServingG || 100} g suggested serving`,
+  }
+})
 </script>
 
 <template>
@@ -265,6 +288,30 @@ watch(
             @update-meal="selectedMeal = $event"
           />
 
+          <div
+            v-if="saveNotice"
+            ref="feedbackRef"
+            class="rounded-[1.6rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300"
+          >
+            {{ saveNotice }}
+          </div>
+
+          <div
+            v-if="mobileSelectionSummary"
+            class="rounded-[1.6rem] border border-primary/20 bg-primary/[0.06] px-4 py-3 lg:hidden"
+          >
+            <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary">Selected food</p>
+            <p class="mt-2 text-lg font-black tracking-tight text-foreground">
+              {{ mobileSelectionSummary.title }}
+            </p>
+            <p class="mt-1 text-sm font-medium text-muted-foreground">
+              {{ mobileSelectionSummary.subtitle }}
+            </p>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {{ mobileSelectionSummary.meta }}
+            </p>
+          </div>
+
           <FoodDashboardSearchHero
             :model-value="foodStore.dashboardQuery"
             :placeholder="mealSearchPlaceholder(selectedMeal)"
@@ -274,6 +321,13 @@ watch(
             @barcode="barcodeDialogOpen = true"
             @ai="labelDialogOpen = true"
           />
+
+          <div
+            v-if="!foodStore.dashboardQuery.trim()"
+            class="rounded-[1.6rem] border border-dashed border-border bg-card/60 px-4 py-3 text-sm text-muted-foreground"
+          >
+            Search by name, scan a barcode, or use recent foods to log {{ selectedMeal }} faster.
+          </div>
 
           <FoodDashboardTabs
             :model-value="foodStore.activeDashboardTab"
@@ -290,6 +344,8 @@ watch(
             :favorite-ids="favoriteIds"
             :selected-food-id="selectedFoodId"
             :show-empty-state="foodStore.combinedSearchState.showEmptyState"
+            :is-searching="foodStore.isSearching"
+            :ai-enabled="foodStore.visionConfigured"
             @select="
               $event.id.startsWith('remote:')
                 ? selectRemoteFood($event)

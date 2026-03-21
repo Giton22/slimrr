@@ -14,7 +14,16 @@ import EditWeightDialog from '@/components/dashboard/EditWeightDialog.vue'
 import type { WeightEntry } from '@/types'
 import WeightTrackerSkeleton from '@/components/dashboard/skeletons/WeightTrackerSkeleton.vue'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   formatRecentLogDisplayDiff,
+  getDeleteWeightEntryDescription,
   getRecentLogChangeClass,
   getRecentLogDisplayDiff,
 } from '@/views/weightTrackerRecentLogs'
@@ -25,10 +34,23 @@ const { format, convert, isKg } = useUnits()
 const logDialogOpen = ref(false)
 const editDialogOpen = ref(false)
 const editingEntry = ref<WeightEntry | null>(null)
+const deleteDialogOpen = ref(false)
+const deleteTarget = ref<WeightEntry | null>(null)
+const isDeleting = ref(false)
+const feedbackMessage = ref('')
+let feedbackTimeout: ReturnType<typeof setTimeout> | null = null
 
 function openEdit(entry: WeightEntry) {
   editingEntry.value = entry
   editDialogOpen.value = true
+}
+
+function setFeedbackMessage(message: string) {
+  feedbackMessage.value = message
+  if (feedbackTimeout) clearTimeout(feedbackTimeout)
+  feedbackTimeout = setTimeout(() => {
+    feedbackMessage.value = ''
+  }, 3000)
 }
 
 const trendText = computed(() => {
@@ -71,6 +93,26 @@ function getChangeClass(index: number): string {
   )
   const direction = store.settings.goalDirection ?? 'loss'
   return getRecentLogChangeClass(diff, direction)
+}
+
+function confirmDelete(entry: WeightEntry) {
+  deleteTarget.value = entry
+  deleteDialogOpen.value = true
+}
+
+async function executeDelete() {
+  if (!deleteTarget.value || isDeleting.value) return
+
+  isDeleting.value = true
+  try {
+    const deletedDate = formatDate(deleteTarget.value.date)
+    await store.deleteEntry(deleteTarget.value.id)
+    setFeedbackMessage(`Deleted the entry for ${deletedDate}.`)
+    deleteDialogOpen.value = false
+    deleteTarget.value = null
+  } finally {
+    isDeleting.value = false
+  }
 }
 </script>
 
@@ -134,6 +176,13 @@ function getChangeClass(index: number): string {
         </CardContent>
       </Card>
 
+      <div
+        v-if="feedbackMessage"
+        class="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300"
+      >
+        {{ feedbackMessage }}
+      </div>
+
       <!-- Grid: Goal Progress + Chart -->
       <div v-if="store.isSynced" class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <!-- Goal Progress (desktop sidebar) -->
@@ -191,7 +240,12 @@ function getChangeClass(index: number): string {
             class="py-12 text-center text-sm text-muted-foreground"
           >
             <Icon icon="lucide:scale" class="mx-auto mb-2 size-10 opacity-30" />
-            <p>No weight entries yet. Log your first weight to get started.</p>
+            <p class="font-semibold text-foreground">No weight entries yet.</p>
+            <p class="mt-2">Log your first weight to start seeing trends and goal progress.</p>
+            <Button class="mt-4 gap-2" @click="logDialogOpen = true">
+              <Icon icon="lucide:plus" class="size-4" />
+              Log First Weight
+            </Button>
           </div>
 
           <!-- Mobile: card list -->
@@ -270,7 +324,7 @@ function getChangeClass(index: number): string {
                         variant="ghost"
                         size="icon"
                         class="size-8"
-                        @click="store.deleteEntry(entry.id)"
+                        @click="confirmDelete(entry)"
                       >
                         <Icon
                           icon="lucide:trash-2"
@@ -289,5 +343,24 @@ function getChangeClass(index: number): string {
 
     <LogWeightDialog v-model:open="logDialogOpen" hide-trigger />
     <EditWeightDialog v-model:open="editDialogOpen" :entry="editingEntry" />
+    <Dialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
+      <DialogContent class="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Delete Entry</DialogTitle>
+          <DialogDescription v-if="deleteTarget">
+            {{ getDeleteWeightEntryDescription(formatDate(deleteTarget.date)) }}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" :disabled="isDeleting" @click="deleteDialogOpen = false">
+            Cancel
+          </Button>
+          <Button variant="destructive" :disabled="isDeleting" @click="executeDelete">
+            <Icon v-if="isDeleting" icon="lucide:loader-circle" class="mr-2 size-4 animate-spin" />
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

@@ -51,19 +51,25 @@ watch(
 <template>
   <!-- Authenticated layout with sidebar + bottom nav -->
   <AppShell v-if="useShell">
-    <RouterView v-slot="{ Component }">
-      <Transition :name="transitionName">
-        <component :is="Component" :key="route.path" />
-      </Transition>
-    </RouterView>
+    <div class="route-transition-frame">
+      <RouterView v-slot="{ Component }">
+        <Transition :name="transitionName" mode="out-in">
+          <div :key="route.path" class="route-page">
+            <component :is="Component" />
+          </div>
+        </Transition>
+      </RouterView>
+    </div>
   </AppShell>
 
   <!-- Minimal layout for auth/setup/404 -->
   <div v-else class="min-h-screen bg-background text-foreground">
-    <main>
+    <main class="route-transition-frame">
       <RouterView v-slot="{ Component }">
         <Transition :name="transitionName" mode="out-in">
-          <component :is="Component" />
+          <div :key="route.path" class="route-page">
+            <component :is="Component" />
+          </div>
         </Transition>
       </RouterView>
     </main>

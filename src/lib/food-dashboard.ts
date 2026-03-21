@@ -1,4 +1,12 @@
-import type { FoodDashboardTab, MealType } from '@/types'
+import type {
+  DashboardNextAction,
+  FoodDashboardTab,
+  FoodFrequent,
+  FoodItem,
+  FoodRecent,
+  MealQuickSuggestion,
+  MealType,
+} from '@/types'
 import { formatDateLong, todayISO } from '@/lib/date'
 
 const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -32,6 +40,18 @@ export function parseNutritionRouteContext(query: Record<string, unknown>) {
   return { date, meal, source }
 }
 
+export function buildNutritionRouteQuery(context: {
+  date: string
+  meal: MealType
+  source?: string
+}) {
+  return {
+    date: context.date,
+    meal: context.meal,
+    source: context.source ?? 'manual',
+  }
+}
+
 export function mealLabel(meal: MealType) {
   return meal.charAt(0).toUpperCase() + meal.slice(1)
 }
@@ -42,4 +62,123 @@ export function mealSearchPlaceholder(meal: MealType) {
 
 export function nutritionContextSubtitle(date: string) {
   return formatDateLong(date)
+}
+
+function defaultMealForAction(date: string, missingMeals: MealType[]): MealType {
+  if (missingMeals.length === 0) return 'breakfast'
+  if (date === todayISO()) {
+    const guessed = guessCurrentMeal()
+    if (missingMeals.includes(guessed)) return guessed
+  }
+  return missingMeals[0] ?? 'breakfast'
+}
+
+export function buildDashboardNextActions(options: {
+  date: string
+  hasWeightEntry: boolean
+  mealCounts: Record<MealType, number>
+}): DashboardNextAction[] {
+  const { date, hasWeightEntry, mealCounts } = options
+  const totalMealsLogged = mealTypes.reduce((sum, meal) => sum + mealCounts[meal], 0)
+  const missingMeals = mealTypes.filter((meal) => mealCounts[meal] === 0)
+  const nextMeal = defaultMealForAction(date, missingMeals)
+  const actions: DashboardNextAction[] = []
+
+  if (!hasWeightEntry) {
+    actions.push({
+      id: 'log-weight',
+      kind: 'log-weight',
+      label: date === todayISO() ? "Log today's weight" : `Log weight for ${formatDateLong(date)}`,
+      description:
+        totalMealsLogged === 0
+          ? 'Start the day with your baseline measurement.'
+          : 'Lock in your measurement before you review the day.',
+    })
+  }
+
+  if (totalMealsLogged === 0) {
+    actions.push({
+      id: `add-${nextMeal}`,
+      kind: 'add-meal',
+      label: `Add ${mealLabel(nextMeal)}`,
+      description: 'Get your first meal logged so your daily summary starts filling in.',
+      mealType: nextMeal,
+    })
+  } else if (missingMeals.length > 0) {
+    actions.push({
+      id: `continue-${nextMeal}`,
+      kind: 'add-meal',
+      label: `Add ${mealLabel(nextMeal)}`,
+      description: `Keep the day complete by filling in ${mealLabel(nextMeal).toLowerCase()}.`,
+      mealType: nextMeal,
+    })
+  }
+
+  if (hasWeightEntry && totalMealsLogged > 0) {
+    actions.push({
+      id: 'review-day',
+      kind: 'review',
+      label: 'Review details',
+      description:
+        missingMeals.length === 0
+          ? 'Everything is logged. Review your full nutrition breakdown.'
+          : 'Review the logged meals and decide what to add next.',
+    })
+  }
+
+  return actions
+}
+
+export function getQuickMealSuggestions(options: {
+  mealType: MealType
+  foodItems: FoodItem[]
+  recents: FoodRecent[]
+  frequent: FoodFrequent[]
+  limit?: number
+}): MealQuickSuggestion[] {
+  const { mealType, foodItems, recents, frequent, limit = 3 } = options
+  const byFoodId = new Map(foodItems.map((item) => [item.id, item]))
+  const suggestions: MealQuickSuggestion[] = []
+  const seen = new Set<string>()
+
+  const recentMatches = [...recents]
+    .filter((entry) => entry.lastMealType === mealType)
+    .sort((a, b) => (b.lastLoggedAt ?? '').localeCompare(a.lastLoggedAt ?? ''))
+
+  for (const entry of recentMatches) {
+    if (seen.has(entry.foodItem)) continue
+    const foodItem = byFoodId.get(entry.foodItem)
+    if (!foodItem) continue
+    seen.add(entry.foodItem)
+    suggestions.push({
+      foodItem,
+      amountG: entry.lastAmountG || foodItem.defaultServingG || 100,
+      mealType,
+      source: 'recent',
+    })
+    if (suggestions.length >= limit) return suggestions
+  }
+
+  const frequentMatches = [...frequent]
+    .filter((entry) => entry.lastMealType === mealType)
+    .sort((a, b) => {
+      if (b.timesLogged !== a.timesLogged) return b.timesLogged - a.timesLogged
+      return (b.lastLoggedAt ?? '').localeCompare(a.lastLoggedAt ?? '')
+    })
+
+  for (const entry of frequentMatches) {
+    if (seen.has(entry.foodItem)) continue
+    const foodItem = byFoodId.get(entry.foodItem)
+    if (!foodItem) continue
+    seen.add(entry.foodItem)
+    suggestions.push({
+      foodItem,
+      amountG: entry.lastAmountG || foodItem.defaultServingG || 100,
+      mealType,
+      source: 'frequent',
+    })
+    if (suggestions.length >= limit) return suggestions
+  }
+
+  return suggestions
 }

@@ -301,7 +301,7 @@ function scrollToSection(id: string) {
       </aside>
 
       <!-- Main content -->
-      <main class="flex-1 lg:overflow-y-auto lg:px-2">
+      <main class="flex-1 lg:px-2">
         <div class="max-w-2xl space-y-8">
           <header>
             <p class="text-sm font-medium uppercase tracking-[0.22em] text-primary/80">

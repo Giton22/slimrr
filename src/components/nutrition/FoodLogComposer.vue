@@ -171,9 +171,9 @@ const preview = computed(() => {
       <div
         class="rounded-[1.6rem] border border-dashed border-border bg-muted/20 px-5 py-10 text-center"
       >
-        <p class="text-lg font-bold text-foreground">Choose a food to continue</p>
+        <p class="text-lg font-bold text-foreground">Pick a food to start logging</p>
         <p class="mt-2 text-sm text-muted-foreground">
-          Search by name, scan a barcode, or use AI label scan.
+          Search by name, scan a barcode, or pick something from your recent foods.
         </p>
       </div>
     </template>

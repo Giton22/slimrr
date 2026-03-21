@@ -69,6 +69,7 @@ export interface Goal {
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 export type FoodSource = 'manual' | 'openfoodfacts' | 'nutrition_label'
 export type FoodDashboardTab = 'frequent' | 'recent' | 'favorites'
+export type DashboardNextActionKind = 'log-weight' | 'add-meal' | 'review'
 export type FoodSearchSource =
   | 'personal'
   | 'openfoodfacts'
@@ -130,6 +131,21 @@ export interface FoodFrequent {
   lastMealType: MealType
   lastAmountG: number
   timesLogged: number
+}
+
+export interface MealQuickSuggestion {
+  foodItem: FoodItem
+  amountG: number
+  mealType: MealType
+  source: 'recent' | 'frequent'
+}
+
+export interface DashboardNextAction {
+  id: string
+  kind: DashboardNextActionKind
+  label: string
+  description: string
+  mealType?: MealType
 }
 
 export interface DailyFoodSummary {

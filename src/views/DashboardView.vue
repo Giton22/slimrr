@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { Icon } from '@iconify/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useWeightStore } from '@/stores/weight'
 import { useFoodStore } from '@/stores/food'
@@ -8,7 +9,14 @@ import { useSwipeDayNavigation } from '@/composables/useSwipeDayNavigation'
 import { useStreaks } from '@/composables/useStreaks'
 import { useUnits } from '@/composables/useUnits'
 import { addDays, formatDateLong, formatDateShort } from '@/lib/date'
-import type { FoodLogEntry, MealType, WeightEntry } from '@/types'
+import { buildDashboardNextActions, getQuickMealSuggestions, mealLabel } from '@/lib/food-dashboard'
+import type {
+  DashboardNextAction,
+  FoodLogEntry,
+  MealQuickSuggestion,
+  MealType,
+  WeightEntry,
+} from '@/types'
 import DashboardSkeleton from '@/components/dashboard/skeletons/DashboardSkeleton.vue'
 import EditFoodLogDialog from '@/components/dashboard/food/EditFoodLogDialog.vue'
 import DailyFoodBreakdown from '@/components/dashboard/food/DailyFoodBreakdown.vue'
@@ -18,6 +26,7 @@ import DiaryHeader from '@/components/dashboard/diary/DiaryHeader.vue'
 import DiarySummaryCard from '@/components/dashboard/diary/DiarySummaryCard.vue'
 import DiaryMealsCard from '@/components/dashboard/diary/DiaryMealsCard.vue'
 import DiaryWeightCard from '@/components/dashboard/diary/DiaryWeightCard.vue'
+import QuickMealSuggestionDialog from '@/components/dashboard/diary/QuickMealSuggestionDialog.vue'
 
 const weightStore = useWeightStore()
 const foodStore = useFoodStore()
@@ -151,6 +160,87 @@ const macroGoals = computed(() => ({
   carbs: weightStore.settings.carbsGoalG ?? 250,
   fat: weightStore.settings.fatGoalG ?? 65,
 }))
+
+const mealCounts = computed<Record<MealType, number>>(() => ({
+  breakfast: meals.value.breakfast.length,
+  lunch: meals.value.lunch.length,
+  dinner: meals.value.dinner.length,
+  snack: meals.value.snack.length,
+}))
+
+const nextActions = computed<DashboardNextAction[]>(() =>
+  buildDashboardNextActions({
+    date: selectedDate.value,
+    hasWeightEntry: !!selectedWeightEntry.value,
+    mealCounts: mealCounts.value,
+  }),
+)
+
+const primaryNextAction = computed(() => nextActions.value[0] ?? null)
+const secondaryNextActions = computed(() => nextActions.value.slice(1))
+
+const quickSuggestions = computed<Record<MealType, MealQuickSuggestion[]>>(() => ({
+  breakfast: getQuickMealSuggestions({
+    mealType: 'breakfast',
+    foodItems: foodStore.foodItems,
+    recents: foodStore.recents,
+    frequent: foodStore.frequent,
+  }),
+  lunch: getQuickMealSuggestions({
+    mealType: 'lunch',
+    foodItems: foodStore.foodItems,
+    recents: foodStore.recents,
+    frequent: foodStore.frequent,
+  }),
+  dinner: getQuickMealSuggestions({
+    mealType: 'dinner',
+    foodItems: foodStore.foodItems,
+    recents: foodStore.recents,
+    frequent: foodStore.frequent,
+  }),
+  snack: getQuickMealSuggestions({
+    mealType: 'snack',
+    foodItems: foodStore.foodItems,
+    recents: foodStore.recents,
+    frequent: foodStore.frequent,
+  }),
+}))
+
+const quickSuggestionDialogOpen = ref(false)
+const selectedSuggestion = ref<MealQuickSuggestion | null>(null)
+const dashboardNotice = ref('')
+let dashboardNoticeTimeout: ReturnType<typeof setTimeout> | null = null
+
+function setDashboardNotice(message: string) {
+  dashboardNotice.value = message
+  if (dashboardNoticeTimeout) clearTimeout(dashboardNoticeTimeout)
+  dashboardNoticeTimeout = setTimeout(() => {
+    dashboardNotice.value = ''
+  }, 3000)
+}
+
+function triggerNextAction(action: DashboardNextAction) {
+  if (action.kind === 'log-weight') {
+    openWeightLogger()
+    return
+  }
+
+  if (action.kind === 'add-meal' && action.mealType) {
+    openAddFood(action.mealType)
+    return
+  }
+
+  void router.push('/nutrition/overview')
+}
+
+function openQuickAddSuggestion(suggestion: MealQuickSuggestion) {
+  selectedSuggestion.value = suggestion
+  quickSuggestionDialogOpen.value = true
+}
+
+function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealType }) {
+  setDashboardNotice(`Added ${payload.foodName} to ${mealLabel(payload.mealType).toLowerCase()}.`)
+}
 </script>
 
 <template>
@@ -172,6 +262,75 @@ const macroGoals = computed(() => ({
           @next="nextDay"
           @today="goToday"
         />
+
+        <section v-if="primaryNextAction" class="space-y-3">
+          <div
+            class="overflow-hidden rounded-[2rem] border border-primary/20 bg-primary/[0.07] shadow-warm-lg"
+          >
+            <div
+              class="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0">
+                <p class="text-xs font-bold uppercase tracking-[0.24em] text-primary">
+                  Next best action
+                </p>
+                <h2 class="mt-2 text-2xl font-black tracking-tight text-foreground">
+                  {{ primaryNextAction.label }}
+                </h2>
+                <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
+                  {{ primaryNextAction.description }}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-warm-md transition-transform hover:scale-[1.01]"
+                @click="triggerNextAction(primaryNextAction)"
+              >
+                <Icon
+                  :icon="
+                    primaryNextAction.kind === 'log-weight'
+                      ? 'lucide:scale'
+                      : primaryNextAction.kind === 'add-meal'
+                        ? 'lucide:utensils'
+                        : 'lucide:chart-column'
+                  "
+                  class="size-4"
+                />
+                {{ primaryNextAction.label }}
+              </button>
+            </div>
+
+            <div
+              v-if="secondaryNextActions.length || dashboardNotice"
+              class="border-t border-primary/10 bg-background/60 px-5 py-3"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <div
+                  v-if="dashboardNotice"
+                  class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                >
+                  <Icon icon="lucide:circle-check-big" class="size-4" />
+                  {{ dashboardNotice }}
+                </div>
+
+                <button
+                  v-for="action in secondaryNextActions"
+                  :key="action.id"
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/5"
+                  @click="triggerNextAction(action)"
+                >
+                  <Icon
+                    :icon="action.kind === 'review' ? 'lucide:arrow-up-right' : 'lucide:plus'"
+                    class="size-4 text-primary"
+                  />
+                  {{ action.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div
           class="relative overflow-hidden"
@@ -225,7 +384,13 @@ const macroGoals = computed(() => ({
                   </RouterLink>
                 </div>
 
-                <DiaryMealsCard :meals="meals" @add="openAddFood" @open="openMealBreakdown" />
+                <DiaryMealsCard
+                  :meals="meals"
+                  :quick-suggestions="quickSuggestions"
+                  @add="openAddFood"
+                  @open="openMealBreakdown"
+                  @quick-add="openQuickAddSuggestion"
+                />
               </section>
 
               <section class="space-y-3">
@@ -264,5 +429,12 @@ const macroGoals = computed(() => ({
 
     <LogWeightDialog v-model:open="logWeightOpen" :initial-date="selectedDate" hide-trigger />
     <EditWeightDialog v-model:open="editWeightOpen" :entry="selectedWeightEntry" />
+    <QuickMealSuggestionDialog
+      v-model:open="quickSuggestionDialogOpen"
+      :suggestion="selectedSuggestion"
+      :date="selectedDate"
+      :meal-type="selectedSuggestion?.mealType ?? 'lunch'"
+      @saved="handleQuickSuggestionSaved"
+    />
   </div>
 </template>
