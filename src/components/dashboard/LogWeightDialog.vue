@@ -26,6 +26,9 @@ const props = defineProps<{
   hideTrigger?: boolean
   initialDate?: string
 }>()
+const emit = defineEmits<{
+  saved: [payload: { date: string; isUpdate: boolean }]
+}>()
 
 const store = useWeightStore()
 const { isKg, convert, toKg } = useUnits()
@@ -77,6 +80,8 @@ async function submit() {
 
   saving.value = true
   try {
+    const savedDate = date.value
+    const wasUpdate = isUpdating.value
     await store.addEntry({
       date: date.value,
       weightKg: toKg(weightField.numericValue.value!),
@@ -90,6 +95,7 @@ async function submit() {
     note.value = ''
     date.value = props.initialDate ?? todayISO()
     open.value = false
+    emit('saved', { date: savedDate, isUpdate: wasUpdate })
   } catch {
     toast.error('Failed to save weight entry')
   } finally {

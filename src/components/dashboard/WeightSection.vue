@@ -14,7 +14,7 @@ const store = useWeightStore()
 const { format, formatDelta } = useUnits()
 
 const goalRemaining = computed(() => {
-  if (store.currentWeight === null) return null
+  if (store.currentWeight === null || store.settings.goalWeightKg === null) return null
   const diff = store.currentWeight - store.settings.goalWeightKg
   const direction = store.settings.goalDirection
 
@@ -53,7 +53,7 @@ const entriesCountHint = computed(() => {
         class="animate-card-enter"
         style="animation-delay: 50ms"
         title="Goal Weight"
-        :value="format(store.settings.goalWeightKg)"
+        :value="store.settings.goalWeightKg !== null ? format(store.settings.goalWeightKg) : '—'"
         :description="goalDescription"
       />
       <StatCard

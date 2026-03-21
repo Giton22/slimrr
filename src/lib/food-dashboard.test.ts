@@ -70,22 +70,100 @@ describe('food-dashboard helpers', () => {
       buildDashboardNextActions({
         date: '2026-03-21',
         hasWeightEntry: false,
+        hasAnyWeightEntries: false,
         mealCounts: { breakfast: 0, lunch: 0, dinner: 0, snack: 0 },
+        hasGoalWeight: true,
+        hasCalorieGoal: true,
       }).map((action) => action.kind),
     ).toEqual(['log-weight', 'add-meal'])
   })
 
-  it('prioritizes the next missing meal when weight is already logged', () => {
+  it('uses the current meal for today when it is still missing', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-21T19:00:00'))
+
     expect(
       buildDashboardNextActions({
         date: '2026-03-21',
         hasWeightEntry: true,
+        hasAnyWeightEntries: true,
         mealCounts: { breakfast: 1, lunch: 0, dinner: 0, snack: 1 },
+        hasGoalWeight: true,
+        hasCalorieGoal: true,
+      })[0],
+    ).toMatchObject({
+      kind: 'add-meal',
+      mealType: 'dinner',
+    })
+
+    vi.useRealTimers()
+  })
+
+  it('falls back to the first missing meal for past dates', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-21T19:00:00'))
+
+    expect(
+      buildDashboardNextActions({
+        date: '2026-03-18',
+        hasWeightEntry: true,
+        hasAnyWeightEntries: true,
+        mealCounts: { breakfast: 1, lunch: 0, dinner: 0, snack: 1 },
+        hasGoalWeight: true,
+        hasCalorieGoal: true,
       })[0],
     ).toMatchObject({
       kind: 'add-meal',
       mealType: 'lunch',
     })
+
+    vi.useRealTimers()
+  })
+
+  it('inserts goal-setting actions when key settings are missing', () => {
+    const actions = buildDashboardNextActions({
+      date: '2026-03-21',
+      hasWeightEntry: true,
+      hasAnyWeightEntries: true,
+      mealCounts: { breakfast: 1, lunch: 1, dinner: 1, snack: 1 },
+      hasGoalWeight: false,
+      hasCalorieGoal: false,
+    })
+
+    expect(actions[0]).toMatchObject({
+      kind: 'settings',
+      route: '/profile',
+      hash: '#body-info',
+    })
+
+    expect(actions[1]).toMatchObject({
+      kind: 'settings',
+      route: '/profile',
+      hash: '#nutrition-goals',
+    })
+  })
+
+  it('returns actions in descending priority order', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-21T19:00:00'))
+
+    const actions = buildDashboardNextActions({
+      date: '2026-03-21',
+      hasWeightEntry: false,
+      hasAnyWeightEntries: true,
+      mealCounts: { breakfast: 0, lunch: 0, dinner: 0, snack: 0 },
+      hasGoalWeight: false,
+      hasCalorieGoal: false,
+    })
+
+    expect(actions.map((action) => action.id)).toEqual([
+      'set-goal-weight',
+      'log-weight',
+      'add-dinner',
+      'set-calorie-goals',
+    ])
+
+    vi.useRealTimers()
   })
 
   it('builds quick meal suggestions from recent entries first, then frequent fallbacks', () => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { toast } from 'vue-sonner'
 import { useWeightStore } from '@/stores/weight'
@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog'
 
 const router = useRouter()
+const route = useRoute()
 const store = useWeightStore()
 const auth = useAuthStore()
 const { isKg, convert, toKg, format } = useUnits()
@@ -75,12 +76,19 @@ const proteinGoalField = useNumericField({
 })
 const carbsGoalField = useNumericField({ min: 1, max: 999, required: false, allowDecimals: false })
 const fatGoalField = useNumericField({ min: 1, max: 999, required: false, allowDecimals: false })
+const calorieGoalField = useNumericField({
+  min: 1,
+  max: 99999,
+  required: false,
+  allowDecimals: false,
+})
 const dateOfBirth = ref(store.settings.dateOfBirth ?? '')
 
 if (store.settings.heightCm) heightField.reset(store.settings.heightCm)
 if (store.settings.proteinGoalG) proteinGoalField.reset(store.settings.proteinGoalG)
 if (store.settings.carbsGoalG) carbsGoalField.reset(store.settings.carbsGoalG)
 if (store.settings.fatGoalG) fatGoalField.reset(store.settings.fatGoalG)
+if (store.currentGlobalKcalGoal) calorieGoalField.reset(store.currentGlobalKcalGoal)
 const sexValue = ref<string>(store.settings.sex ?? '')
 const goalDirectionValue = ref<string>(store.settings.goalDirection ?? '')
 
@@ -133,6 +141,13 @@ watch(
 )
 
 watch(
+  () => store.currentGlobalKcalGoal,
+  (goal) => {
+    if (goal && !calorieGoalField.displayValue.value) calorieGoalField.reset(goal)
+  },
+)
+
+watch(
   () => store.settings.goalDirection,
   (d) => {
     if (d) goalDirectionValue.value = d
@@ -146,7 +161,9 @@ async function saveSettings() {
   const proteinValid = proteinGoalField.validate()
   const carbsValid = carbsGoalField.validate()
   const fatValid = fatGoalField.validate()
-  if (!heightValid || !goalValid || !proteinValid || !carbsValid || !fatValid) return
+  const calorieValid = calorieGoalField.validate()
+  if (!heightValid || !goalValid || !proteinValid || !carbsValid || !fatValid || !calorieValid)
+    return
 
   isSaving.value = true
   saveSuccess.value = false
@@ -163,7 +180,7 @@ async function saveSettings() {
 
   await store.persistSettings({
     heightCm: heightParsed ?? store.settings.heightCm,
-    goalWeightKg: goalKg > 0 ? goalKg : store.settings.goalWeightKg,
+    goalWeightKg: goalKg > 0 ? goalKg : null,
     dateOfBirth: dateOfBirth.value || undefined,
     sex: (sexValue.value as 'male' | 'female') || undefined,
     goalDirection: (goalDirectionValue.value as 'loss' | 'gain') || undefined,
@@ -171,6 +188,10 @@ async function saveSettings() {
     carbsGoalG: carbsGoalField.numericValue.value ?? undefined,
     fatGoalG: fatGoalField.numericValue.value ?? undefined,
   })
+
+  if (calorieGoalField.numericValue.value) {
+    await store.setGlobalKcalGoal(Math.round(calorieGoalField.numericValue.value))
+  }
 
   isSaving.value = false
   saveSuccess.value = true
@@ -273,6 +294,18 @@ function scrollToSection(id: string) {
   activeSection.value = id
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 }
+
+watch(
+  () => route.hash,
+  async (hash) => {
+    if (!hash) return
+    const id = hash.slice(1)
+    activeSection.value = id
+    await nextTick()
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -290,7 +323,7 @@ function scrollToSection(id: string) {
             <h1 class="text-base font-bold">{{ auth.currentUser?.name || 'User' }}</h1>
             <p class="text-xs text-muted-foreground">
               {{ store.settings.goalDirection === 'gain' ? 'Goal: Gain' : 'Goal: Lose' }}
-              {{ store.settings.goalWeightKg ? format(store.settings.goalWeightKg) : '' }}
+              {{ store.settings.goalWeightKg ? format(store.settings.goalWeightKg) : 'Not set' }}
             </p>
           </div>
         </div>
@@ -514,7 +547,27 @@ function scrollToSection(id: string) {
                 <div class="mb-5">
                   <p class="font-bold">Daily Macro Targets</p>
                   <p class="text-sm text-muted-foreground">
-                    These goals power the progress bars on the dashboard and nutrition screen.
+                    These goals power the coach card, dashboard progress bars, and nutrition views.
+                  </p>
+                </div>
+
+                <div class="mb-5 grid gap-1.5">
+                  <Label for="calorie-goal">Daily Calories (kcal)</Label>
+                  <Input
+                    id="calorie-goal"
+                    v-model="calorieGoalField.displayValue.value"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="e.g. 2200"
+                    class="max-w-[240px]"
+                    v-bind="calorieGoalField.inputAttrs.value"
+                    :class="{ 'animate-shake': calorieGoalField.shaking.value }"
+                  />
+                  <p v-if="calorieGoalField.error.value" class="text-xs text-destructive">
+                    {{ calorieGoalField.error.value }}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Used for the dashboard summary and daily calorie coaching.
                   </p>
                 </div>
 
@@ -566,6 +619,24 @@ function scrollToSection(id: string) {
                       {{ fatGoalField.error.value }}
                     </p>
                   </div>
+                </div>
+
+                <div class="flex items-center gap-3 pt-5">
+                  <Button type="button" :disabled="isSaving" @click="saveSettings">
+                    <Icon
+                      v-if="isSaving"
+                      icon="lucide:loader-circle"
+                      class="mr-2 size-4 animate-spin"
+                    />
+                    <Icon v-else icon="lucide:save" class="mr-2 size-4" />
+                    {{ isSaving ? 'Saving...' : 'Save Nutrition Goals' }}
+                  </Button>
+                  <Transition name="fade">
+                    <span v-if="saveSuccess" class="flex items-center gap-1 text-sm text-success">
+                      <Icon icon="lucide:check" class="size-4" />
+                      Saved
+                    </span>
+                  </Transition>
                 </div>
               </CardContent>
             </Card>

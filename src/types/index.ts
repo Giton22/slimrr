@@ -69,7 +69,7 @@ export interface Goal {
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 export type FoodSource = 'manual' | 'openfoodfacts' | 'nutrition_label'
 export type FoodDashboardTab = 'frequent' | 'recent' | 'favorites'
-export type DashboardNextActionKind = 'log-weight' | 'add-meal' | 'review'
+export type DashboardNextActionKind = 'log-weight' | 'add-meal' | 'review' | 'settings'
 export type FoodSearchSource =
   | 'personal'
   | 'openfoodfacts'
@@ -146,6 +146,9 @@ export interface DashboardNextAction {
   label: string
   description: string
   mealType?: MealType
+  route?: string
+  hash?: string
+  priority: number
 }
 
 export interface DailyFoodSummary {
@@ -165,7 +168,7 @@ export type GoalDirection = 'loss' | 'gain'
 
 export interface UserSettings {
   unit: WeightUnit
-  goalWeightKg: number
+  goalWeightKg: number | null
   heightCm: number
   dateOfBirth?: string // YYYY-MM-DD
   sex?: Sex

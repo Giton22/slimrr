@@ -168,6 +168,9 @@ async function executeDelete() {
                 </span>
               </p>
             </div>
+            <p v-else class="mt-2 text-xs text-muted-foreground">
+              Set a goal weight in Profile to unlock progress coaching.
+            </p>
           </div>
           <Button size="lg" class="gap-2 text-base font-bold" @click="logDialogOpen = true">
             <Icon icon="lucide:plus" class="size-5" />
@@ -202,7 +205,10 @@ async function executeDelete() {
                 store.settings.unit
               }}</span>
             </div>
-            <GoalProgressBar class="mt-6" />
+            <GoalProgressBar v-if="store.settings.goalWeightKg" class="mt-6" />
+            <p v-else class="mt-6 text-sm text-muted-foreground">
+              Add a goal weight in Profile to see how far you have left to go.
+            </p>
           </CardContent>
         </Card>
 

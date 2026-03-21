@@ -38,7 +38,7 @@ describe('weight settings helpers', () => {
   it('creates the default user settings state', () => {
     expect(createDefaultUserSettings()).toEqual({
       unit: 'kg',
-      goalWeightKg: 75,
+      goalWeightKg: null,
       heightCm: 178,
       dateOfBirth: undefined,
       sex: undefined,

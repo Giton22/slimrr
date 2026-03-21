@@ -76,15 +76,41 @@ function defaultMealForAction(date: string, missingMeals: MealType[]): MealType 
 export function buildDashboardNextActions(options: {
   date: string
   hasWeightEntry: boolean
+  hasAnyWeightEntries: boolean
   mealCounts: Record<MealType, number>
+  hasGoalWeight: boolean
+  hasCalorieGoal: boolean
 }): DashboardNextAction[] {
-  const { date, hasWeightEntry, mealCounts } = options
+  const { date, hasWeightEntry, hasAnyWeightEntries, mealCounts, hasGoalWeight, hasCalorieGoal } =
+    options
   const totalMealsLogged = mealTypes.reduce((sum, meal) => sum + mealCounts[meal], 0)
   const missingMeals = mealTypes.filter((meal) => mealCounts[meal] === 0)
   const nextMeal = defaultMealForAction(date, missingMeals)
   const actions: DashboardNextAction[] = []
 
-  if (!hasWeightEntry) {
+  if (!hasAnyWeightEntries) {
+    actions.push({
+      id: 'log-first-weight',
+      kind: 'log-weight',
+      label: 'Log your first weight',
+      description: 'Start with a baseline so Slimrr can coach you from real progress.',
+      priority: 700,
+    })
+  }
+
+  if (!hasGoalWeight) {
+    actions.push({
+      id: 'set-goal-weight',
+      kind: 'settings',
+      label: 'Set your goal weight',
+      description: 'Add a target so your dashboard can show progress and what to do next.',
+      route: '/profile',
+      hash: '#body-info',
+      priority: 600,
+    })
+  }
+
+  if (hasAnyWeightEntries && !hasWeightEntry) {
     actions.push({
       id: 'log-weight',
       kind: 'log-weight',
@@ -93,6 +119,7 @@ export function buildDashboardNextActions(options: {
         totalMealsLogged === 0
           ? 'Start the day with your baseline measurement.'
           : 'Lock in your measurement before you review the day.',
+      priority: 500,
     })
   }
 
@@ -103,6 +130,7 @@ export function buildDashboardNextActions(options: {
       label: `Add ${mealLabel(nextMeal)}`,
       description: 'Get your first meal logged so your daily summary starts filling in.',
       mealType: nextMeal,
+      priority: 400,
     })
   } else if (missingMeals.length > 0) {
     actions.push({
@@ -111,6 +139,19 @@ export function buildDashboardNextActions(options: {
       label: `Add ${mealLabel(nextMeal)}`,
       description: `Keep the day complete by filling in ${mealLabel(nextMeal).toLowerCase()}.`,
       mealType: nextMeal,
+      priority: 350,
+    })
+  }
+
+  if (!hasCalorieGoal) {
+    actions.push({
+      id: 'set-calorie-goals',
+      kind: 'settings',
+      label: 'Set calorie and macro goals',
+      description: 'Add daily targets so the summary and nutrition progress bars become useful.',
+      route: '/profile',
+      hash: '#nutrition-goals',
+      priority: 250,
     })
   }
 
@@ -118,15 +159,19 @@ export function buildDashboardNextActions(options: {
     actions.push({
       id: 'review-day',
       kind: 'review',
-      label: 'Review details',
+      label: date === todayISO() ? "Review today's details" : 'Review details',
       description:
         missingMeals.length === 0
           ? 'Everything is logged. Review your full nutrition breakdown.'
           : 'Review the logged meals and decide what to add next.',
+      route: '/nutrition/overview',
+      priority: 150,
     })
   }
 
   return actions
+    .sort((a, b) => b.priority - a.priority)
+    .filter((action, index, list) => list.findIndex((item) => item.id === action.id) === index)
 }
 
 export function getQuickMealSuggestions(options: {

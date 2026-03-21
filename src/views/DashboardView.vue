@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useWeightStore } from '@/stores/weight'
@@ -10,6 +10,7 @@ import { useStreaks } from '@/composables/useStreaks'
 import { useUnits } from '@/composables/useUnits'
 import { addDays, formatDateLong, formatDateShort } from '@/lib/date'
 import { buildDashboardNextActions, getQuickMealSuggestions, mealLabel } from '@/lib/food-dashboard'
+import { clearSetupCoachWelcomePending, hasSetupCoachWelcomePending } from '@/lib/setupCoach'
 import type {
   DashboardNextAction,
   FoodLogEntry,
@@ -74,7 +75,10 @@ const daySummary = computed(() => {
 })
 
 const consumed = computed(() => daySummary.value?.consumedKcal ?? 0)
-const goal = computed(() => daySummary.value?.goalKcal ?? 2000)
+const goal = computed(() => daySummary.value?.goalKcal ?? weightStore.currentGlobalKcalGoal ?? 0)
+const hasCalorieGoal = computed(
+  () => (daySummary.value?.goalKcal ?? weightStore.currentGlobalKcalGoal ?? null) !== null,
+)
 
 const dailyFoodSummary = computed(
   () => foodStore.dailyFoodSummaries.get(selectedDate.value) ?? null,
@@ -99,6 +103,12 @@ const latestWeight = computed(() => {
   if (!weightStore.latestEntry) return null
   return weightStore.latestEntry ? format(weightStore.latestEntry.weightKg) : null
 })
+const latestWeightDateLabel = computed(() => {
+  if (!weightStore.latestEntry) return null
+  return formatDateShort(weightStore.latestEntry.date)
+})
+const hasAnyWeightEntries = computed(() => weightStore.sortedEntries.length > 0)
+const hasGoalWeight = computed(() => weightStore.settings.goalWeightKg !== null)
 
 const selectedWeightLabel = computed(() => {
   if (isToday.value) return 'For today'
@@ -172,12 +182,15 @@ const nextActions = computed<DashboardNextAction[]>(() =>
   buildDashboardNextActions({
     date: selectedDate.value,
     hasWeightEntry: !!selectedWeightEntry.value,
+    hasAnyWeightEntries: hasAnyWeightEntries.value,
     mealCounts: mealCounts.value,
+    hasGoalWeight: hasGoalWeight.value,
+    hasCalorieGoal: hasCalorieGoal.value,
   }),
 )
 
 const primaryNextAction = computed(() => nextActions.value[0] ?? null)
-const secondaryNextActions = computed(() => nextActions.value.slice(1))
+const secondaryNextActions = computed(() => nextActions.value.slice(1, 3))
 
 const quickSuggestions = computed<Record<MealType, MealQuickSuggestion[]>>(() => ({
   breakfast: getQuickMealSuggestions({
@@ -209,6 +222,7 @@ const quickSuggestions = computed<Record<MealType, MealQuickSuggestion[]>>(() =>
 const quickSuggestionDialogOpen = ref(false)
 const selectedSuggestion = ref<MealQuickSuggestion | null>(null)
 const dashboardNotice = ref('')
+const showSetupCoachWelcome = ref(hasSetupCoachWelcomePending())
 let dashboardNoticeTimeout: ReturnType<typeof setTimeout> | null = null
 
 function setDashboardNotice(message: string) {
@@ -217,6 +231,28 @@ function setDashboardNotice(message: string) {
   dashboardNoticeTimeout = setTimeout(() => {
     dashboardNotice.value = ''
   }, 3000)
+}
+
+function clearSetupCoachWelcome() {
+  if (!showSetupCoachWelcome.value) return
+  showSetupCoachWelcome.value = false
+  clearSetupCoachWelcomePending()
+}
+
+watch(hasAnyWeightEntries, (value) => {
+  if (value) clearSetupCoachWelcome()
+})
+
+onBeforeUnmount(() => {
+  clearSetupCoachWelcome()
+  if (dashboardNoticeTimeout) clearTimeout(dashboardNoticeTimeout)
+})
+
+function coachActionIcon(action: DashboardNextAction) {
+  if (action.kind === 'log-weight') return 'lucide:scale'
+  if (action.kind === 'add-meal') return 'lucide:utensils'
+  if (action.kind === 'settings') return 'lucide:sliders-horizontal'
+  return 'lucide:chart-column'
 }
 
 function triggerNextAction(action: DashboardNextAction) {
@@ -230,7 +266,15 @@ function triggerNextAction(action: DashboardNextAction) {
     return
   }
 
-  void router.push('/nutrition/overview')
+  if (action.kind === 'settings' && action.route) {
+    void router.push({
+      path: action.route,
+      hash: action.hash,
+    })
+    return
+  }
+
+  void router.push(action.route ?? '/nutrition/overview')
 }
 
 function openQuickAddSuggestion(suggestion: MealQuickSuggestion) {
@@ -239,7 +283,24 @@ function openQuickAddSuggestion(suggestion: MealQuickSuggestion) {
 }
 
 function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealType }) {
+  clearSetupCoachWelcome()
   setDashboardNotice(`Added ${payload.foodName} to ${mealLabel(payload.mealType).toLowerCase()}.`)
+}
+
+function handleWeightSaved(payload: { date: string; isUpdate: boolean }) {
+  clearSetupCoachWelcome()
+  setDashboardNotice(
+    payload.isUpdate
+      ? `Updated your weight for ${payload.date}.`
+      : `Logged your weight for ${payload.date}.`,
+  )
+}
+
+function openNutritionGoals() {
+  void router.push({
+    path: '/profile',
+    hash: '#nutrition-goals',
+  })
 }
 </script>
 
@@ -272,13 +333,20 @@ function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealT
             >
               <div class="min-w-0">
                 <p class="text-xs font-bold uppercase tracking-[0.24em] text-primary">
-                  Next best action
+                  {{ showSetupCoachWelcome ? 'Welcome to Slimrr' : 'Next best action' }}
                 </p>
                 <h2 class="mt-2 text-2xl font-black tracking-tight text-foreground">
                   {{ primaryNextAction.label }}
                 </h2>
                 <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
                   {{ primaryNextAction.description }}
+                </p>
+                <p
+                  v-if="showSetupCoachWelcome"
+                  class="mt-3 max-w-2xl rounded-2xl border border-primary/15 bg-background/70 px-3 py-2 text-sm text-muted-foreground"
+                >
+                  You’re ready. Start with one small step and the coach will keep the rest of the
+                  day focused.
                 </p>
               </div>
 
@@ -287,16 +355,7 @@ function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealT
                 class="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-warm-md transition-transform hover:scale-[1.01]"
                 @click="triggerNextAction(primaryNextAction)"
               >
-                <Icon
-                  :icon="
-                    primaryNextAction.kind === 'log-weight'
-                      ? 'lucide:scale'
-                      : primaryNextAction.kind === 'add-meal'
-                        ? 'lucide:utensils'
-                        : 'lucide:chart-column'
-                  "
-                  class="size-4"
-                />
+                <Icon :icon="coachActionIcon(primaryNextAction)" class="size-4" />
                 {{ primaryNextAction.label }}
               </button>
             </div>
@@ -321,10 +380,7 @@ function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealT
                   class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/5"
                   @click="triggerNextAction(action)"
                 >
-                  <Icon
-                    :icon="action.kind === 'review' ? 'lucide:arrow-up-right' : 'lucide:plus'"
-                    class="size-4 text-primary"
-                  />
+                  <Icon :icon="coachActionIcon(action)" class="size-4 text-primary" />
                   {{ action.label }}
                 </button>
               </div>
@@ -364,12 +420,14 @@ function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealT
                 <DiarySummaryCard
                   :consumed="consumed"
                   :goal="goal"
+                  :has-calorie-goal="hasCalorieGoal"
                   :protein="dailyFoodSummary?.totalProtein ?? 0"
                   :protein-goal="macroGoals.protein"
                   :carbs="dailyFoodSummary?.totalCarbs ?? 0"
                   :carbs-goal="macroGoals.carbs"
                   :fat="dailyFoodSummary?.totalFat ?? 0"
                   :fat-goal="macroGoals.fat"
+                  @open-goals="openNutritionGoals"
                 />
               </section>
 
@@ -406,9 +464,14 @@ function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealT
 
                 <DiaryWeightCard
                   :display-value="displayedWeight"
-                  :goal-value="format(weightStore.settings.goalWeightKg)"
+                  :goal-value="
+                    weightStore.settings.goalWeightKg !== null
+                      ? format(weightStore.settings.goalWeightKg)
+                      : null
+                  "
                   :selected-date-label="selectedWeightLabel"
                   :latest-value="latestWeight"
+                  :latest-date-label="latestWeightDateLabel"
                   :has-entry="!!selectedWeightEntry"
                   @edit="openWeightEditor"
                   @log="openWeightLogger"
@@ -427,7 +490,12 @@ function handleQuickSuggestionSaved(payload: { foodName: string; mealType: MealT
       @add-food="openAddFood"
     />
 
-    <LogWeightDialog v-model:open="logWeightOpen" :initial-date="selectedDate" hide-trigger />
+    <LogWeightDialog
+      v-model:open="logWeightOpen"
+      :initial-date="selectedDate"
+      hide-trigger
+      @saved="handleWeightSaved"
+    />
     <EditWeightDialog v-model:open="editWeightOpen" :entry="selectedWeightEntry" />
     <QuickMealSuggestionDialog
       v-model:open="quickSuggestionDialogOpen"

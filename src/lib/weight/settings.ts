@@ -5,7 +5,7 @@ import type { UserSettingsRecord } from '@/lib/pocketbase'
 export function createDefaultUserSettings(): UserSettings {
   return {
     unit: 'kg',
-    goalWeightKg: 75,
+    goalWeightKg: null,
     heightCm: 178,
     dateOfBirth: undefined,
     sex: undefined,
@@ -32,7 +32,7 @@ export function toUserSettings(record: UserSettingsRecord): UserSettings {
 
   return {
     unit: record.unit,
-    goalWeightKg: record.goal_weight_kg,
+    goalWeightKg: record.goal_weight_kg ?? null,
     heightCm: record.height_cm,
     dateOfBirth: record.date_of_birth || undefined,
     sex: (record.sex as Sex) || undefined,
@@ -52,7 +52,7 @@ export async function saveUserSettings(
   const payload = {
     user: userId,
     unit: settings.unit,
-    goal_weight_kg: settings.goalWeightKg,
+    goal_weight_kg: settings.goalWeightKg ?? null,
     height_cm: settings.heightCm,
     date_of_birth: settings.dateOfBirth ?? '',
     sex: settings.sex ?? '',

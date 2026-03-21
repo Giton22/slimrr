@@ -3,9 +3,10 @@ import { Icon } from '@iconify/vue'
 
 defineProps<{
   displayValue: string
-  goalValue: string
+  goalValue?: string | null
   selectedDateLabel: string
   latestValue?: string | null
+  latestDateLabel?: string | null
   hasEntry: boolean
 }>()
 
@@ -22,7 +23,9 @@ defineEmits<{
     <div class="flex items-start justify-between gap-4">
       <div>
         <p class="text-xl font-bold tracking-tight">Weight</p>
-        <p class="mt-2 text-sm font-medium text-muted-foreground">Goal: {{ goalValue }}</p>
+        <p class="mt-2 text-sm font-medium text-muted-foreground">
+          Goal: {{ goalValue || 'Not set' }}
+        </p>
         <p class="mt-1 text-xs text-muted-foreground">
           {{ selectedDateLabel }}
         </p>
@@ -54,7 +57,13 @@ defineEmits<{
       <p v-if="hasEntry" class="mt-2 text-sm text-muted-foreground">Entry logged for this day</p>
       <p v-else class="mt-2 text-sm text-muted-foreground">
         No entry for this day
-        <span v-if="latestValue" class="text-muted-foreground/70">· Latest {{ latestValue }}</span>
+        <span v-if="latestDateLabel" class="text-muted-foreground/70">
+          · Latest entry is from {{ latestDateLabel }}
+          <span v-if="latestValue">({{ latestValue }})</span>
+        </span>
+        <span v-else-if="latestValue" class="text-muted-foreground/70"
+          >· Latest {{ latestValue }}</span
+        >
       </p>
     </div>
   </div>

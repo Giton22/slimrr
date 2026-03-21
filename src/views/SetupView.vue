@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useWeightStore } from '@/stores/weight'
 import { lbsToKg } from '@/composables/useUnits'
 import { useNumericField } from '@/composables/useNumericField'
+import { markSetupCoachWelcomePending } from '@/lib/setupCoach'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -41,6 +42,27 @@ const dateOfBirth = ref('')
 const sex = ref('')
 
 const isLoading = ref(false)
+
+const hasGoalWeight = computed(() => {
+  const value = goalWeightField.numericValue.value
+  return typeof value === 'number' && value > 0
+})
+
+const completionSummary = computed(() =>
+  hasGoalWeight.value
+    ? 'Your dashboard will open with a guided next step so you can start tracking right away.'
+    : 'Your dashboard will guide you through the first log, then help you tighten up your goals.',
+)
+
+const completionHint = computed(() =>
+  hasGoalWeight.value
+    ? 'After your first weight entry, Slimrr can compare each check-in against your target.'
+    : 'You can set a goal weight later from Profile after your first log.',
+)
+
+const completionCtaLabel = computed(() =>
+  hasGoalWeight.value ? 'Go to Dashboard' : 'Go log first weight',
+)
 
 // Convert display weight to kg for storage
 function displayToKg(val: number): number | undefined {
@@ -89,7 +111,7 @@ async function finish() {
     await weightStore.persistSettings({
       unit: unit.value,
       heightCm: heightParsed && heightParsed > 0 ? heightParsed : undefined,
-      goalWeightKg: goalKg,
+      goalWeightKg: goalKg ?? null,
       dateOfBirth: dateOfBirth.value || undefined,
       sex: (sex.value as 'male' | 'female') || undefined,
     })
@@ -109,6 +131,7 @@ async function finish() {
 }
 
 function goToDashboard() {
+  markSetupCoachWelcomePending()
   router.push('/')
 }
 </script>
@@ -382,13 +405,19 @@ function goToDashboard() {
         </CardHeader>
         <CardContent class="flex flex-col gap-4">
           <div class="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-            <p>
-              Start by logging your first weight on the dashboard. You can update your profile
-              settings at any time from the menu.
+            <p class="font-medium text-foreground">You're ready.</p>
+            <p class="mt-2">
+              {{ completionSummary }}
+            </p>
+            <p class="mt-3 rounded-md border border-primary/15 bg-primary/6 px-3 py-2 text-sm">
+              First recommendation: log your first weight from the dashboard coach card.
+            </p>
+            <p class="mt-3 text-xs">
+              {{ completionHint }}
             </p>
           </div>
           <Button class="w-full" @click="goToDashboard">
-            Go to Dashboard
+            {{ completionCtaLabel }}
             <Icon icon="lucide:arrow-right" class="ml-2 h-4 w-4" />
           </Button>
         </CardContent>
