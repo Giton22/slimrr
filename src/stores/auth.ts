@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import type { AuthRecord } from 'pocketbase'
 import { pb } from '@/lib/pocketbase'
 import { checkSetupComplete, markSetupComplete } from '@/lib/appConfig'
-import { useWeightStore } from '@/stores/weight'
 
 export const useAuthStore = defineStore('auth', () => {
   // PocketBase persists auth state in localStorage automatically via authStore
@@ -64,8 +63,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
-    // Unsubscribe while token is still valid to avoid 403
-    useWeightStore().unsubscribeRealtime()
     pb.authStore.clear()
     currentUser.value = null
   }

@@ -207,9 +207,6 @@ export const useWeightStore = defineStore('weight', () => {
         settingsRecordId.value = rec.id
       }
 
-      // Load food data in parallel
-      await useFoodStore().loadFoodData()
-
       isSynced.value = true
     } finally {
       isLoading.value = false
@@ -283,8 +280,6 @@ export const useWeightStore = defineStore('weight', () => {
       },
       { filter },
     )
-
-    useFoodStore().subscribeRealtime()
   }
 
   function unsubscribeRealtime() {
@@ -292,7 +287,6 @@ export const useWeightStore = defineStore('weight', () => {
     void pb.collection(COLLECTIONS.CALORIE_ENTRIES).unsubscribe('*')
     void pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).unsubscribe('*')
     void pb.collection(COLLECTIONS.USER_SETTINGS).unsubscribe('*')
-    useFoodStore().unsubscribeRealtime()
   }
 
   function reset() {
@@ -318,7 +312,6 @@ export const useWeightStore = defineStore('weight', () => {
     calorieCustomRange.value = null
     averageMode.value = 'daily'
     isSynced.value = false
-    useFoodStore().reset()
   }
 
   // ── Settings helpers ──
@@ -344,8 +337,22 @@ export const useWeightStore = defineStore('weight', () => {
       dashboard_layout: JSON.stringify(next.dashboardLayout ?? []),
     }
 
-    if (settingsRecordId.value) {
-      await pb.collection(COLLECTIONS.USER_SETTINGS).update(settingsRecordId.value, payload)
+    let recordId = settingsRecordId.value
+
+    if (!recordId) {
+      const existingSettings = await pb
+        .collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS)
+        .getFullList({
+          filter: pb.filter('user = {:userId}', { userId }),
+          sort: '-created',
+          limit: 1,
+        })
+      recordId = existingSettings[0]?.id ?? null
+    }
+
+    if (recordId) {
+      await pb.collection(COLLECTIONS.USER_SETTINGS).update(recordId, payload)
+      settingsRecordId.value = recordId
     } else {
       const rec = await pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).create(payload)
       settingsRecordId.value = rec.id
@@ -857,7 +864,7 @@ export const useWeightStore = defineStore('weight', () => {
       body: formData,
     })
 
-    await loadAll()
+    await Promise.all([loadAll(), useFoodStore().loadFoodData()])
     return result
   }
 

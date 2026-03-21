@@ -10,6 +10,7 @@ import { useWeightStore } from '@/stores/weight'
 import { useFoodStore } from '@/stores/food'
 import { useGroupsStore } from '@/stores/groups'
 import { useToday } from '@/composables/useToday'
+import { createSessionBootstrap } from '@/lib/sessionBootstrap'
 import { navDirection } from '@/router'
 
 // Start the midnight-check timer so the reactive `today` ref stays current
@@ -20,6 +21,11 @@ const auth = useAuthStore()
 const weightStore = useWeightStore()
 const foodStore = useFoodStore()
 const groupsStore = useGroupsStore()
+const sessionBootstrap = createSessionBootstrap({
+  weight: weightStore,
+  food: foodStore,
+  groups: groupsStore,
+})
 
 // Pages that use a minimal layout (no sidebar/bottom nav)
 const minimalPages = new Set(['auth', 'setup', 'not-found'])
@@ -36,17 +42,7 @@ const transitionName = computed(() => {
 watch(
   () => auth.isAuthenticated,
   async (authenticated) => {
-    if (authenticated) {
-      await weightStore.loadAll()
-      weightStore.subscribeRealtime()
-      await foodStore.loadFoodData()
-      foodStore.subscribeRealtime()
-      await groupsStore.loadMyGroups()
-    } else {
-      weightStore.reset()
-      foodStore.reset()
-      groupsStore.reset()
-    }
+    await sessionBootstrap.sync(authenticated)
   },
   { immediate: true },
 )

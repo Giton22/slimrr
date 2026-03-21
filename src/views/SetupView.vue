@@ -81,12 +81,7 @@ async function finish() {
     // 1. Register + auto-login
     await auth.register(email.value.trim(), password.value)
 
-    // 2. Load user data so persistSettings knows whether to create or update
-    //    the settings record. App.vue's isAuthenticated watcher also calls loadAll(),
-    //    but may not have resolved yet — we need it synchronous here.
-    await weightStore.loadAll()
-
-    // 3. Persist all profile settings collected in step 3
+    // 2. Persist all profile settings collected in step 3
     const heightParsed = heightField.numericValue.value
     const goalKg = goalWeightField.numericValue.value
       ? displayToKg(goalWeightField.numericValue.value)
@@ -99,10 +94,10 @@ async function finish() {
       sex: (sex.value as 'male' | 'female') || undefined,
     })
 
-    // 4. Mark setup complete in app_config (requires auth, which we now have)
+    // 3. Mark setup complete in app_config (requires auth, which we now have)
     await auth.completeSetup()
 
-    // 5. Show completion screen
+    // 4. Show completion screen
     step.value = 4
   } catch (e: unknown) {
     accountError.value = e instanceof Error ? e.message : 'Setup failed. Please try again.'
