@@ -20,14 +20,35 @@ import type {
 import { todayISO } from '@/lib/date'
 import { today } from '@/composables/useToday'
 import { getBmiCategory } from '@/composables/useBmi'
+import {
+  buildCalorieChartData,
+  buildDailyCalorieRows,
+  calculateWeeklyCalorieAverage,
+  getGlobalKcalGoalForDate as lookupGlobalKcalGoalForDate,
+  getTodayCalorieSummary,
+} from '@/lib/weight/calories'
 import type { CsvDataType, CsvImportError, CsvImportResult } from '@/lib/weight/csv'
 import { exportCsvData, importCsvData } from '@/lib/weight/csv'
+import type { CustomDateRange, WeightAverageMode } from '@/lib/weight/metrics'
+import {
+  averageWeightEntries,
+  buildWeightChartData,
+  calculateAge,
+  calculateBmi,
+  calculateHealthyWeightRange,
+  calculatePeriodWeightAverage,
+  calculateWeightToHealthyBmi,
+  calculateWeightTrend,
+  cutoffISO,
+  filterWeightEntries,
+  getISOWeekKey,
+  sortEntriesByDate,
+} from '@/lib/weight/metrics'
 import { createDefaultUserSettings, saveUserSettings, toUserSettings } from '@/lib/weight/settings'
 import { useGroupsStore } from '@/stores/groups'
 import { useFoodStore } from '@/stores/food'
 
-type AverageMode = 'daily' | 'weekly' | 'monthly'
-type CustomDateRange = { start: string; end: string }
+type AverageMode = WeightAverageMode
 export type { CsvDataType, CsvImportError, CsvImportResult } from '@/lib/weight/csv'
 
 // ── Record → domain type mappers ──
@@ -59,41 +80,6 @@ function toKcalGoalChange(r: KcalGoalChangeRecord): KcalGoalChange {
     effectiveFrom: r.effective_from,
     kcal: r.kcal,
   }
-}
-
-// ── Week helpers ──
-
-function getISOWeekKey(dateStr: string): string {
-  const d = new Date(dateStr)
-  const day = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - day)
-  const year = d.getUTCFullYear()
-  const week = Math.ceil(((d.getTime() - Date.UTC(year, 0, 1)) / 86400000 + 1) / 7)
-  return `${year}-W${String(week).padStart(2, '0')}`
-}
-
-function cutoffISO(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function isDateInRange(
-  date: string,
-  range: TimeRange,
-  customRange: CustomDateRange | null,
-): boolean {
-  if (range === 'custom') {
-    if (!customRange) {
-      return date >= cutoffISO(30)
-    }
-    if (customRange.start > customRange.end) {
-      return false
-    }
-    return date >= customRange.start && date <= customRange.end
-  }
-
-  return date >= cutoffISO(range)
 }
 
 // ── Store ──
@@ -282,120 +268,46 @@ export const useWeightStore = defineStore('weight', () => {
 
   // ── Weight getters ──
 
-  const sortedEntries = computed(() =>
-    [...entries.value].sort((a, b) => a.date.localeCompare(b.date)),
-  )
+  const sortedEntries = computed(() => sortEntriesByDate(entries.value))
 
-  const filteredEntries = computed(() => {
-    return sortedEntries.value.filter((e) =>
-      isDateInRange(e.date, weightTimeRange.value, weightCustomRange.value),
-    )
-  })
+  const filteredEntries = computed(() =>
+    filterWeightEntries(sortedEntries.value, weightTimeRange.value, weightCustomRange.value),
+  )
 
   const latestEntry = computed(() => sortedEntries.value.at(-1))
 
   const currentWeight = computed(() => latestEntry.value?.weightKg ?? null)
 
-  const bmi = computed(() => {
-    if (!currentWeight.value || !settings.value.heightCm) return null
-    const heightM = settings.value.heightCm / 100
-    return Math.round((currentWeight.value / (heightM * heightM)) * 10) / 10
-  })
+  const bmi = computed(() => calculateBmi(currentWeight.value, settings.value.heightCm))
 
   // WHO BMI category (delegated to shared composable)
   const bmiCategory = computed(() => getBmiCategory(bmi.value))
 
-  // Healthy weight range (BMI 18.5–24.9) at user's height
-  const healthyWeightRange = computed((): { minKg: number; maxKg: number } | null => {
-    if (!settings.value.heightCm) return null
-    const heightM = settings.value.heightCm / 100
-    const minKg = Math.round(18.5 * heightM * heightM * 10) / 10
-    const maxKg = Math.round(24.9 * heightM * heightM * 10) / 10
-    return { minKg, maxKg }
-  })
+  const healthyWeightRange = computed(() => calculateHealthyWeightRange(settings.value.heightCm))
 
-  // How many kg to gain/lose to reach the healthy BMI range (negative = need to lose, positive = need to gain)
-  const weightToHealthyBmi = computed((): number | null => {
-    const w = currentWeight.value
-    const range = healthyWeightRange.value
-    if (w === null || range === null) return null
-    if (w < range.minKg) return Math.round((range.minKg - w) * 10) / 10 // need to gain
-    if (w > range.maxKg) return Math.round((range.maxKg - w) * 10) / 10 // negative = need to lose
-    return 0 // already in range
-  })
-
-  // Age derived from dateOfBirth
-  const age = computed((): number | null => {
-    const dob = settings.value.dateOfBirth
-    if (!dob) return null
-    const birth = new Date(dob)
-    const today = new Date()
-    let years = today.getFullYear() - birth.getFullYear()
-    const monthDiff = today.getMonth() - birth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      years--
-    }
-    return years >= 0 ? years : null
-  })
-
-  const weightTrend = computed(() => {
-    const sorted = sortedEntries.value
-    if (sorted.length < 2) return null
-
-    const recent = sorted.slice(-7)
-    const older = sorted.slice(-14, -7)
-    if (older.length === 0) return null
-
-    const recentAvg = recent.reduce((s, e) => s + e.weightKg, 0) / recent.length
-    const olderAvg = older.reduce((s, e) => s + e.weightKg, 0) / older.length
-    return Math.round((recentAvg - olderAvg) * 100) / 100
-  })
-
-  const averagedEntries = computed((): WeightEntry[] => {
-    const data = filteredEntries.value
-    if (averageMode.value === 'daily') return data
-
-    const groups = new Map<string, WeightEntry[]>()
-    for (const entry of data) {
-      const key =
-        averageMode.value === 'weekly' ? getISOWeekKey(entry.date) : entry.date.slice(0, 7) // YYYY-MM
-      const group = groups.get(key) ?? []
-      group.push(entry)
-      groups.set(key, group)
-    }
-
-    return [...groups.values()].map((group) => {
-      const avgKg = group.reduce((s, e) => s + e.weightKg, 0) / group.length
-      return {
-        id: group[group.length - 1]!.id,
-        date: group[group.length - 1]!.date,
-        weightKg: Math.round(avgKg * 100) / 100,
-      }
-    })
-  })
-
-  const weeklyAverage = computed<{ avg: number; count: number } | null>(() => {
-    const currentWeekKey = getISOWeekKey(today.value)
-    const weekEntries = sortedEntries.value.filter((e) => getISOWeekKey(e.date) === currentWeekKey)
-    if (weekEntries.length === 0) return null
-    const avg = weekEntries.reduce((s, e) => s + e.weightKg, 0) / weekEntries.length
-    return { avg: Math.round(avg * 100) / 100, count: weekEntries.length }
-  })
-
-  const monthlyAverage = computed<{ avg: number; count: number } | null>(() => {
-    const currentMonthKey = today.value.slice(0, 7)
-    const monthEntries = sortedEntries.value.filter((e) => e.date.slice(0, 7) === currentMonthKey)
-    if (monthEntries.length === 0) return null
-    const avg = monthEntries.reduce((s, e) => s + e.weightKg, 0) / monthEntries.length
-    return { avg: Math.round(avg * 100) / 100, count: monthEntries.length }
-  })
-
-  const chartData = computed(() =>
-    filteredEntries.value.map((e) => ({
-      date: new Date(e.date).getTime(),
-      weight: e.weightKg,
-    })),
+  const weightToHealthyBmi = computed(() =>
+    calculateWeightToHealthyBmi(currentWeight.value, healthyWeightRange.value),
   )
+
+  const age = computed(() => calculateAge(settings.value.dateOfBirth))
+
+  const weightTrend = computed(() => calculateWeightTrend(sortedEntries.value))
+
+  const averagedEntries = computed(() =>
+    averageWeightEntries(filteredEntries.value, averageMode.value),
+  )
+
+  const weeklyAverage = computed<{ avg: number; count: number } | null>(() =>
+    calculatePeriodWeightAverage(sortedEntries.value, getISOWeekKey(today.value), getISOWeekKey),
+  )
+
+  const monthlyAverage = computed<{ avg: number; count: number } | null>(() =>
+    calculatePeriodWeightAverage(sortedEntries.value, today.value.slice(0, 7), (date) =>
+      date.slice(0, 7),
+    ),
+  )
+
+  const chartData = computed(() => buildWeightChartData(filteredEntries.value))
 
   // ── Kcal goal helpers ──
 
@@ -404,127 +316,34 @@ export const useWeightStore = defineStore('weight', () => {
   )
 
   const currentGlobalKcalGoal = computed<number | null>(() => {
-    return getGlobalKcalGoalForDate(today.value)
+    return lookupGlobalKcalGoalForDate(sortedKcalGoalHistory.value, today.value)
   })
-
-  function getGlobalKcalGoalForDate(date: string): number | null {
-    const sorted = sortedKcalGoalHistory.value
-    let result: number | null = null
-    for (const change of sorted) {
-      if (change.effectiveFrom <= date) {
-        result = change.kcal
-      } else {
-        break
-      }
-    }
-    return result
-  }
 
   // ── Derived daily calorie rows — only dates with a logged entry ──
 
-  const dailyCalorieRows = computed((): DailyCalorieRow[] => {
-    const goals = sortedKcalGoalHistory.value
-    const foodStore = useFoodStore()
-    const foodSummaries = foodStore.dailyFoodSummaries
-
-    // Collect all dates that have either calorie entries or food log entries in range
-    const dateSet = new Set<string>()
-    for (const e of calorieEntries.value) {
-      if (isDateInRange(e.date, calorieTimeRange.value, calorieCustomRange.value)) {
-        dateSet.add(e.date)
-      }
-    }
-    for (const [date] of foodSummaries) {
-      if (isDateInRange(date, calorieTimeRange.value, calorieCustomRange.value)) {
-        dateSet.add(date)
-      }
-    }
-
-    const allDates = [...dateSet].sort()
-
-    // Build a lookup for calorie entries by date
-    const calorieByDate = new Map<string, CalorieEntry>()
-    for (const e of calorieEntries.value) {
-      calorieByDate.set(e.date, e)
-    }
-
-    let goalIndex = 0
-    let activeGlobalGoal: number | null = null
-
-    return allDates.map((date) => {
-      while (goalIndex < goals.length && goals[goalIndex]!.effectiveFrom <= date) {
-        activeGlobalGoal = goals[goalIndex]!.kcal
-        goalIndex++
-      }
-
-      const calorieEntry = calorieByDate.get(date)
-      const foodSummary = foodSummaries.get(date)
-
-      const hasOverride = calorieEntry?.goalOverrideKcal != null
-      const goal = hasOverride ? calorieEntry!.goalOverrideKcal! : activeGlobalGoal
-      const source: DailyCalorieRow['goalSource'] = hasOverride
-        ? 'override'
-        : goal !== null
-          ? 'global'
-          : 'none'
-
-      // Food log sums take precedence; fall back to legacy calorie_entries
-      let consumed: number | null = null
-      if (foodSummary) {
-        consumed = foodSummary.totalCalories
-      } else if (calorieEntry) {
-        consumed = calorieEntry.calories
-      }
-
-      let delta: number | null = null
-      let exceeded = false
-      if (consumed !== null && goal !== null) {
-        delta = consumed - goal
-        exceeded = consumed > goal
-      }
-
-      return {
-        date,
-        consumedKcal: consumed,
-        goalKcal: goal,
-        goalSource: source,
-        deltaKcal: delta,
-        isExceeded: exceeded,
-        hasEntry: true,
-        note: calorieEntry?.note,
-      }
-    })
-  })
+  const dailyCalorieRows = computed((): DailyCalorieRow[] =>
+    buildDailyCalorieRows({
+      calorieEntries: calorieEntries.value,
+      foodSummaries: useFoodStore().dailyFoodSummaries,
+      goals: sortedKcalGoalHistory.value,
+      range: calorieTimeRange.value,
+      customRange: calorieCustomRange.value,
+    }),
+  )
 
   // ── Kcal chart data ──
 
-  const calorieChartData = computed(() =>
-    dailyCalorieRows.value.map((row) => ({
-      date: new Date(row.date).getTime(),
-      consumed: row.consumedKcal ?? 0,
-      goal: row.goalKcal ?? 0,
-      exceeded: row.isExceeded,
-      hasConsumed: row.consumedKcal !== null,
-      hasGoal: row.goalKcal !== null,
-    })),
-  )
+  const calorieChartData = computed(() => buildCalorieChartData(dailyCalorieRows.value))
 
   // ── Kcal summary stats ──
 
-  const todayCalorieSummary = computed(() => {
-    const row = dailyCalorieRows.value.find((r) => r.date === today.value)
-    return row ?? null
-  })
+  const todayCalorieSummary = computed(() =>
+    getTodayCalorieSummary(dailyCalorieRows.value, today.value),
+  )
 
-  const weeklyCalorieAverage = computed<number | null>(() => {
-    const currentWeekKey = getISOWeekKey(today.value)
-    const weekRows = dailyCalorieRows.value.filter(
-      (r) => r.consumedKcal !== null && getISOWeekKey(r.date) === currentWeekKey,
-    )
-    if (weekRows.length === 0) return null
-    const sum = weekRows.reduce((s, r) => s + r.consumedKcal!, 0)
-    return Math.round(sum / weekRows.length)
-  })
+  const weeklyCalorieAverage = computed<number | null>(() =>
+    calculateWeeklyCalorieAverage(dailyCalorieRows.value, today.value),
+  )
 
   // ── Weight actions ──
 
