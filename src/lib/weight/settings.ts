@@ -78,7 +78,6 @@ async function findLatestUserSettingsRecordId(userId: string): Promise<string | 
     .collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS)
     .getFullList({
       filter: pb.filter('user = {:userId}', { userId }),
-      sort: '-created',
     })
 
   return existingSettings[0]?.id ?? null
