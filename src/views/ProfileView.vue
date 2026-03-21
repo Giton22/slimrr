@@ -8,6 +8,7 @@ import type { CsvDataType } from '@/stores/weight'
 import { useAuthStore } from '@/stores/auth'
 import { useUnits } from '@/composables/useUnits'
 import { useTheme, type ColorTheme } from '@/composables/useTheme'
+import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useNumericField } from '@/composables/useNumericField'
 import BmiHalfCircleGauge from '@/components/dashboard/BmiHalfCircleGauge.vue'
 import { Card, CardContent } from '@/components/ui/card'
@@ -35,6 +36,25 @@ const store = useWeightStore()
 const auth = useAuthStore()
 const { isKg, convert, toKg, format } = useUnits()
 const { theme, setTheme, colorTheme, setColorTheme, colorThemes } = useTheme()
+const { needRefresh, updateServiceWorker } = usePwaUpdate()
+const isCheckingUpdate = ref(false)
+
+async function checkForAppUpdate() {
+  isCheckingUpdate.value = true
+  try {
+    const registration = await navigator.serviceWorker.getRegistration()
+    if (registration) {
+      await registration.update()
+      if (!needRefresh.value) {
+        toast.info('You are on the latest version.')
+      }
+    }
+  } catch {
+    toast.error('Could not check for updates.')
+  } finally {
+    isCheckingUpdate.value = false
+  }
+}
 
 function setColorThemeByValue(value: unknown) {
   if (typeof value !== 'string') return
@@ -628,6 +648,36 @@ function scrollToSection(id: string) {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <!-- App update -->
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-bold">App Update</p>
+                    <p class="text-sm text-muted-foreground">
+                      <template v-if="needRefresh">A new version is available!</template>
+                      <template v-else>Check for the latest version</template>
+                    </p>
+                  </div>
+                  <Button v-if="needRefresh" size="sm" class="gap-2" @click="updateServiceWorker()">
+                    <Icon icon="lucide:refresh-cw" class="size-4" />
+                    Update Now
+                  </Button>
+                  <Button
+                    v-else
+                    variant="outline"
+                    size="sm"
+                    class="gap-2"
+                    :disabled="isCheckingUpdate"
+                    @click="checkForAppUpdate"
+                  >
+                    <Icon
+                      icon="lucide:refresh-cw"
+                      class="size-4"
+                      :class="{ 'animate-spin': isCheckingUpdate }"
+                    />
+                    {{ isCheckingUpdate ? 'Checking...' : 'Check for Update' }}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

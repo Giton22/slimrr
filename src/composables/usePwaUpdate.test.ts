@@ -137,7 +137,14 @@ describe('usePwaUpdate', () => {
     cleanup()
   })
 
-  it('calls updateServiceWorker with explicit reload intent', async () => {
+  it('calls updateServiceWorker and explicitly reloads the page', async () => {
+    updateServiceWorkerMock.mockResolvedValue(undefined)
+    const reloadMock = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { reload: reloadMock },
+    })
+
     useRegisterSWMock.mockReturnValue({
       needRefresh: ref(true),
       offlineReady: ref(false),
@@ -148,6 +155,7 @@ describe('usePwaUpdate', () => {
     await updateServiceWorker()
 
     expect(updateServiceWorkerMock).toHaveBeenCalledWith(true)
+    expect(reloadMock).toHaveBeenCalledOnce()
   })
 
   it('cleans up listeners when the composable scope is disposed', () => {

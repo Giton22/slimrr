@@ -74,7 +74,14 @@ export function usePwaUpdate() {
   return {
     needRefresh,
     offlineReady,
-    updateServiceWorker: () => updateServiceWorker(true),
+    updateServiceWorker: async () => {
+      await updateServiceWorker(true)
+      // vite-plugin-pwa v0.13.2+ ignores the reloadPage param and relies on
+      // the workbox-window "controlling" event to trigger window.location.reload().
+      // That event doesn't fire reliably on mobile standalone PWAs, so we
+      // explicitly reload after giving the SW time to call skipWaiting().
+      window.location.reload()
+    },
     close,
   }
 }
