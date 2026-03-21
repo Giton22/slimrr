@@ -5,11 +5,11 @@ import { useWeightStore } from '@/stores/weight'
 import { useFoodStore } from '@/stores/food'
 import { today } from '@/composables/useToday'
 import { useSwipeDayNavigation } from '@/composables/useSwipeDayNavigation'
+import { useStreaks } from '@/composables/useStreaks'
 import { useUnits } from '@/composables/useUnits'
 import { addDays, formatDateLong, formatDateShort } from '@/lib/date'
 import type { FoodLogEntry, MealType, WeightEntry } from '@/types'
 import DashboardSkeleton from '@/components/dashboard/skeletons/DashboardSkeleton.vue'
-import StreakCard from '@/components/dashboard/StreakCard.vue'
 import EditFoodLogDialog from '@/components/dashboard/food/EditFoodLogDialog.vue'
 import DailyFoodBreakdown from '@/components/dashboard/food/DailyFoodBreakdown.vue'
 import LogWeightDialog from '@/components/dashboard/LogWeightDialog.vue'
@@ -23,6 +23,7 @@ const weightStore = useWeightStore()
 const foodStore = useFoodStore()
 const router = useRouter()
 const { format } = useUnits()
+const { currentStreak, streakJustIncreased } = useStreaks()
 
 const selectedDate = ref(today.value)
 const isToday = computed(() => selectedDate.value === today.value)
@@ -165,6 +166,8 @@ const macroGoals = computed(() => ({
           :title="headerTitle"
           :subtitle="headerSubtitle"
           :is-today="isToday"
+          :streak-count="currentStreak"
+          :streak-just-increased="streakJustIncreased"
           @prev="prevDay"
           @next="nextDay"
           @today="goToday"
@@ -223,13 +226,6 @@ const macroGoals = computed(() => ({
                 </div>
 
                 <DiaryMealsCard :meals="meals" @add="openAddFood" @open="openMealBreakdown" />
-              </section>
-
-              <section class="space-y-3">
-                <div class="flex items-center justify-between gap-3">
-                  <h2 class="text-3xl font-black tracking-tight text-foreground">Consistency</h2>
-                </div>
-                <StreakCard variant="diary" />
               </section>
 
               <section class="space-y-3">

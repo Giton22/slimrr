@@ -6,6 +6,8 @@ defineProps<{
   title: string
   subtitle: string
   isToday: boolean
+  streakCount: number
+  streakJustIncreased?: boolean
 }>()
 
 defineEmits<{
@@ -29,7 +31,30 @@ defineEmits<{
         </p>
       </div>
 
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 self-start">
+        <div
+          class="flex h-11 min-w-[4.5rem] items-center justify-center gap-2 rounded-full border px-3 shadow-sm transition-all duration-300"
+          :class="
+            streakCount > 0
+              ? [
+                  'border-amber-200/80 bg-amber-50 text-amber-700',
+                  streakJustIncreased
+                    ? 'scale-[1.03] shadow-[0_0_0_4px_rgba(251,191,36,0.16)]'
+                    : '',
+                ]
+              : 'border-border bg-background text-muted-foreground'
+          "
+          aria-label="Current streak"
+        >
+          <Icon
+            icon="lucide:flame"
+            class="size-[18px]"
+            :class="streakCount > 0 ? 'text-amber-500' : 'text-muted-foreground'"
+          />
+          <span class="text-base font-black tabular-nums leading-none">
+            {{ streakCount }}
+          </span>
+        </div>
         <Button
           variant="ghost"
           size="icon"
