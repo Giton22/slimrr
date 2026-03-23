@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { AuthRecord } from 'pocketbase'
+import { runPb } from '@/lib/effect'
 import { pb } from '@/lib/pocketbase'
 import { checkSetupComplete, markSetupComplete } from '@/lib/appConfig'
 
@@ -88,7 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     _checkSetupPromise = (async () => {
       try {
-        const result = await checkSetupComplete()
+        const result = await runPb(checkSetupComplete())
         setupComplete.value = result.setupComplete
         if (result.collectionMissing) {
           console.info(
@@ -117,7 +118,7 @@ export const useAuthStore = defineStore('auth', () => {
    * (app_config updateRule requires a valid auth token).
    */
   async function completeSetup(): Promise<void> {
-    await markSetupComplete()
+    await runPb(markSetupComplete())
     setupComplete.value = true
   }
 

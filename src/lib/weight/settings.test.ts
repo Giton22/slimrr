@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { Effect } from 'effect'
 
 const { filterMock, getFullListMock, updateMock, createMock, collectionMock } = vi.hoisted(() => ({
   filterMock: vi.fn(),
@@ -18,7 +19,17 @@ vi.mock('@/lib/pocketbase', () => ({
   },
 }))
 
+import { PocketBaseService } from '@/lib/effect'
 import { createDefaultUserSettings, saveUserSettings, toUserSettings } from '@/lib/weight/settings'
+
+const mockPb = {
+  filter: filterMock,
+  collection: collectionMock,
+}
+
+function runWithPb<A>(effect: Effect.Effect<A, unknown, PocketBaseService>) {
+  return Effect.runPromise(effect.pipe(Effect.provideService(PocketBaseService, mockPb as never)))
+}
 
 describe('weight settings helpers', () => {
   beforeEach(() => {
@@ -86,14 +97,16 @@ describe('weight settings helpers', () => {
   it('updates an existing settings record when one is already known', async () => {
     updateMock.mockResolvedValueOnce(undefined)
 
-    const recordId = await saveUserSettings(
-      'user-1',
-      {
-        unit: 'kg',
-        goalWeightKg: 80,
-        heightCm: 182,
-      },
-      'settings-1',
+    const recordId = await runWithPb(
+      saveUserSettings(
+        'user-1',
+        {
+          unit: 'kg',
+          goalWeightKg: 80,
+          heightCm: 182,
+        },
+        'settings-1',
+      ),
     )
 
     expect(recordId).toBe('settings-1')
@@ -105,14 +118,16 @@ describe('weight settings helpers', () => {
     getFullListMock.mockResolvedValueOnce([{ id: 'settings-2' }])
     updateMock.mockResolvedValueOnce(undefined)
 
-    const recordId = await saveUserSettings(
-      'user-1',
-      {
-        unit: 'kg',
-        goalWeightKg: 80,
-        heightCm: 182,
-      },
-      null,
+    const recordId = await runWithPb(
+      saveUserSettings(
+        'user-1',
+        {
+          unit: 'kg',
+          goalWeightKg: 80,
+          heightCm: 182,
+        },
+        null,
+      ),
     )
 
     expect(filterMock).toHaveBeenCalledWith('user = {:userId}', { userId: 'user-1' })
@@ -128,14 +143,16 @@ describe('weight settings helpers', () => {
     getFullListMock.mockResolvedValueOnce([])
     createMock.mockResolvedValueOnce({ id: 'settings-3' })
 
-    const recordId = await saveUserSettings(
-      'user-1',
-      {
-        unit: 'kg',
-        goalWeightKg: 80,
-        heightCm: 182,
-      },
-      null,
+    const recordId = await runWithPb(
+      saveUserSettings(
+        'user-1',
+        {
+          unit: 'kg',
+          goalWeightKg: 80,
+          heightCm: 182,
+        },
+        null,
+      ),
     )
 
     expect(recordId).toBe('settings-3')

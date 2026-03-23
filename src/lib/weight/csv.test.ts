@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vite-plus/test'
+import { Effect } from 'effect'
 
 const { sendMock } = vi.hoisted(() => ({
   sendMock: vi.fn(),
@@ -14,7 +15,16 @@ vi.mock('@/lib/pocketbase', () => ({
   pocketbaseUrl: 'https://example.test/',
 }))
 
+import { PocketBaseService } from '@/lib/effect'
 import { exportCsvData, extractFilenameFromDisposition, importCsvData } from '@/lib/weight/csv'
+
+const mockPb = {
+  send: sendMock,
+}
+
+function runWithPb<A>(effect: Effect.Effect<A, unknown, PocketBaseService>) {
+  return Effect.runPromise(effect.pipe(Effect.provideService(PocketBaseService, mockPb as never)))
+}
 
 describe('weight csv helpers', () => {
   it('parses utf-8 filenames from content disposition', () => {
@@ -39,7 +49,7 @@ describe('weight csv helpers', () => {
     sendMock.mockResolvedValueOnce(expectedResult)
 
     const file = new File(['date,weight\n2026-03-21,80'], 'weight.csv', { type: 'text/csv' })
-    const result = await importCsvData('weight', file)
+    const result = await runWithPb(importCsvData('weight', file))
 
     expect(result).toEqual(expectedResult)
     expect(sendMock).toHaveBeenCalledTimes(1)
@@ -59,7 +69,7 @@ describe('weight csv helpers', () => {
       },
     } as unknown as Response)
 
-    const result = await exportCsvData('calories', 'abc123', fetchMock)
+    const result = await Effect.runPromise(exportCsvData('calories', 'abc123', fetchMock))
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://example.test/api/data/export/csv?type=calories',

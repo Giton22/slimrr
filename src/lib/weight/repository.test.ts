@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { Effect } from 'effect'
 
 const {
   filterMock,
@@ -36,6 +37,7 @@ vi.mock('@/lib/pocketbase', () => ({
   },
 }))
 
+import { PocketBaseService } from '@/lib/effect'
 import {
   deleteCalorieEntryRecord,
   deleteWeightEntryRecord,
@@ -57,6 +59,15 @@ function collectionApi() {
     create: createMock,
     delete: deleteMock,
   }
+}
+
+const mockPb = {
+  filter: filterMock,
+  collection: collectionMock,
+}
+
+function runWithPb<A>(effect: Effect.Effect<A, unknown, PocketBaseService>) {
+  return Effect.runPromise(effect.pipe(Effect.provideService(PocketBaseService, mockPb as never)))
 }
 
 describe('weight repository', () => {
@@ -97,7 +108,7 @@ describe('weight repository', () => {
         },
       ])
 
-    const result = await loadWeightStoreData('user-1')
+    const result = await runWithPb(loadWeightStoreData('user-1'))
 
     expect(result).toEqual({
       entries: [{ id: 'w1', date: '2026-03-20', weightKg: 80, note: undefined }],
@@ -140,7 +151,7 @@ describe('weight repository', () => {
       })
 
     await expect(
-      saveWeightEntryRecord('user-1', { date: '2026-03-20', weightKg: 80.2 }, undefined),
+      runWithPb(saveWeightEntryRecord('user-1', { date: '2026-03-20', weightKg: 80.2 }, undefined)),
     ).resolves.toEqual({
       id: 'w1',
       date: '2026-03-20',
@@ -149,10 +160,12 @@ describe('weight repository', () => {
     })
 
     await expect(
-      saveWeightEntryRecord(
-        'user-1',
-        { date: '2026-03-20', weightKg: 79.8, note: 'updated' },
-        { id: 'w1', date: '2026-03-20', weightKg: 80.2 },
+      runWithPb(
+        saveWeightEntryRecord(
+          'user-1',
+          { date: '2026-03-20', weightKg: 79.8, note: 'updated' },
+          { id: 'w1', date: '2026-03-20', weightKg: 80.2 },
+        ),
       ),
     ).resolves.toEqual({
       id: 'w1',
@@ -162,7 +175,7 @@ describe('weight repository', () => {
     })
 
     await expect(
-      saveCalorieEntryRecord('user-1', '2026-03-20', { calories: 2000 }, undefined),
+      runWithPb(saveCalorieEntryRecord('user-1', '2026-03-20', { calories: 2000 }, undefined)),
     ).resolves.toEqual({
       id: 'c1',
       date: '2026-03-20',
@@ -178,22 +191,26 @@ describe('weight repository', () => {
     deleteMock.mockResolvedValue(undefined)
 
     await expect(
-      saveGlobalKcalGoalRecord('user-1', '2026-03-20', 2200, {
-        id: 'g1',
-        effectiveFrom: '2026-03-20',
-        kcal: 2300,
-      }),
+      runWithPb(
+        saveGlobalKcalGoalRecord('user-1', '2026-03-20', 2200, {
+          id: 'g1',
+          effectiveFrom: '2026-03-20',
+          kcal: 2300,
+        }),
+      ),
     ).resolves.toEqual({ id: 'g1', effectiveFrom: '2026-03-20', kcal: 2200 })
 
-    await expect(saveGlobalKcalGoalRecord('user-1', '2026-03-21', 2100)).resolves.toEqual({
+    await expect(
+      runWithPb(saveGlobalKcalGoalRecord('user-1', '2026-03-21', 2100)),
+    ).resolves.toEqual({
       id: 'g2',
       effectiveFrom: '2026-03-21',
       kcal: 2100,
     })
 
-    await patchWeightEntryRecord('w1', { weightKg: 79.9, note: 'patched' })
-    await deleteWeightEntryRecord('w1')
-    await deleteCalorieEntryRecord('c1')
+    await runWithPb(patchWeightEntryRecord('w1', { weightKg: 79.9, note: 'patched' }))
+    await runWithPb(deleteWeightEntryRecord('w1'))
+    await runWithPb(deleteCalorieEntryRecord('c1'))
 
     expect(updateMock).toHaveBeenCalledWith('w1', { weight_kg: 79.9, note: 'patched' })
     expect(deleteMock).toHaveBeenCalledWith('w1')

@@ -1,4 +1,6 @@
+import { Effect } from 'effect'
 import type { CalorieEntry, KcalGoalChange, UserSettings, WeightEntry } from '@/types'
+import { fromPbPromise } from '@/lib/effect'
 import { COLLECTIONS, pb } from '@/lib/pocketbase'
 import type {
   CalorieEntryRecord,
@@ -45,40 +47,58 @@ export interface LoadedWeightStoreData {
   settingsRecordId: string | null
 }
 
-export async function loadWeightStoreData(
-  userId: string,
-  lookbackDays = 365,
-): Promise<LoadedWeightStoreData> {
+export function loadWeightStoreData(userId: string, lookbackDays = 365) {
   const userFilter = pb.filter('user = {:userId}', { userId })
   const dateBoundFilter = pb.filter('user = {:userId} && date >= {:cutoff}', {
     userId,
     cutoff: cutoffISO(lookbackDays),
   })
 
-  const [weightRecords, calorieRecords, kcalGoalRecords, settingsRecords] = await Promise.all([
-    pb
-      .collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES)
-      .getFullList({ filter: dateBoundFilter, sort: 'date' }),
-    pb
-      .collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES)
-      .getFullList({ filter: dateBoundFilter, sort: 'date' }),
-    pb
-      .collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY)
-      .getFullList({ filter: userFilter, sort: 'effective_from' }),
-    pb
-      .collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS)
-      .getFullList({ filter: userFilter }),
-  ])
+  return Effect.all(
+    {
+      weightRecords: fromPbPromise(
+        (pb) =>
+          pb
+            .collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES)
+            .getFullList({ filter: dateBoundFilter, sort: 'date' }),
+        COLLECTIONS.WEIGHT_ENTRIES,
+      ),
+      calorieRecords: fromPbPromise(
+        (pb) =>
+          pb
+            .collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES)
+            .getFullList({ filter: dateBoundFilter, sort: 'date' }),
+        COLLECTIONS.CALORIE_ENTRIES,
+      ),
+      kcalGoalRecords: fromPbPromise(
+        (pb) =>
+          pb
+            .collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY)
+            .getFullList({ filter: userFilter, sort: 'effective_from' }),
+        COLLECTIONS.KCAL_GOAL_HISTORY,
+      ),
+      settingsRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).getFullList({
+            filter: userFilter,
+          }),
+        COLLECTIONS.USER_SETTINGS,
+      ),
+    },
+    { concurrency: 'unbounded' },
+  ).pipe(
+    Effect.map(({ weightRecords, calorieRecords, kcalGoalRecords, settingsRecords }) => {
+      const settingsRecord = settingsRecords[0] ?? null
 
-  const settingsRecord = settingsRecords[0] ?? null
-
-  return {
-    entries: weightRecords.map(toWeightEntry),
-    calorieEntries: calorieRecords.map(toCalorieEntry),
-    kcalGoalHistory: kcalGoalRecords.map(toKcalGoalChange),
-    settings: settingsRecord ? toUserSettings(settingsRecord) : null,
-    settingsRecordId: settingsRecord?.id ?? null,
-  }
+      return {
+        entries: weightRecords.map(toWeightEntry),
+        calorieEntries: calorieRecords.map(toCalorieEntry),
+        kcalGoalHistory: kcalGoalRecords.map(toKcalGoalChange),
+        settings: settingsRecord ? toUserSettings(settingsRecord) : null,
+        settingsRecordId: settingsRecord?.id ?? null,
+      }
+    }),
+  )
 }
 
 export interface WeightRealtimeHandlers {
@@ -133,129 +153,216 @@ export function unsubscribeWeightRealtime() {
   void pb.collection(COLLECTIONS.USER_SETTINGS).unsubscribe('*')
 }
 
-export async function saveWeightEntryRecord(
+export function saveWeightEntryRecord(
   userId: string,
   entry: Omit<WeightEntry, 'id'>,
   existing?: WeightEntry,
-): Promise<WeightEntry> {
+) {
   if (existing) {
-    await pb.collection(COLLECTIONS.WEIGHT_ENTRIES).update(existing.id, {
-      weight_kg: entry.weightKg,
-      note: entry.note ?? '',
-    })
-    return { ...existing, weightKg: entry.weightKg, note: entry.note }
+    return fromPbPromise(
+      (pb) =>
+        pb.collection(COLLECTIONS.WEIGHT_ENTRIES).update(existing.id, {
+          weight_kg: entry.weightKg,
+          note: entry.note ?? '',
+        }),
+      COLLECTIONS.WEIGHT_ENTRIES,
+    ).pipe(Effect.as({ ...existing, weightKg: entry.weightKg, note: entry.note }))
   }
 
-  const record = await pb.collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES).create({
-    user: userId,
-    date: entry.date,
-    weight_kg: entry.weightKg,
-    note: entry.note ?? '',
-  })
-
-  return toWeightEntry(record)
+  return fromPbPromise(
+    (pb) =>
+      pb.collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES).create({
+        user: userId,
+        date: entry.date,
+        weight_kg: entry.weightKg,
+        note: entry.note ?? '',
+      }),
+    COLLECTIONS.WEIGHT_ENTRIES,
+  ).pipe(Effect.map(toWeightEntry))
 }
 
-export async function patchWeightEntryRecord(
+export function patchWeightEntryRecord(
   id: string,
   patch: Partial<Pick<WeightEntry, 'weightKg' | 'note'>>,
-): Promise<void> {
+) {
   const payload: Record<string, unknown> = {}
   if (patch.weightKg !== undefined) payload.weight_kg = patch.weightKg
   if (patch.note !== undefined) payload.note = patch.note ?? ''
-  await pb.collection(COLLECTIONS.WEIGHT_ENTRIES).update(id, payload)
+  return fromPbPromise(
+    (pb) => pb.collection(COLLECTIONS.WEIGHT_ENTRIES).update(id, payload),
+    COLLECTIONS.WEIGHT_ENTRIES,
+  ).pipe(Effect.asVoid)
 }
 
-export async function deleteWeightEntryRecord(id: string): Promise<void> {
-  await pb.collection(COLLECTIONS.WEIGHT_ENTRIES).delete(id)
+export function deleteWeightEntryRecord(id: string) {
+  return fromPbPromise(
+    (pb) => pb.collection(COLLECTIONS.WEIGHT_ENTRIES).delete(id),
+    COLLECTIONS.WEIGHT_ENTRIES,
+  ).pipe(Effect.asVoid)
 }
 
-export async function saveGlobalKcalGoalRecord(
+export function saveGlobalKcalGoalRecord(
   userId: string,
   effectiveFrom: string,
   kcal: number,
   existing?: KcalGoalChange,
-): Promise<KcalGoalChange> {
+) {
   if (existing) {
-    await pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).update(existing.id, { kcal })
-    return { ...existing, kcal }
+    return fromPbPromise(
+      (pb) => pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).update(existing.id, { kcal }),
+      COLLECTIONS.KCAL_GOAL_HISTORY,
+    ).pipe(Effect.as({ ...existing, kcal }))
   }
 
-  const record = await pb.collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY).create({
-    user: userId,
-    effective_from: effectiveFrom,
-    kcal,
-  })
-  return toKcalGoalChange(record)
+  return fromPbPromise(
+    (pb) =>
+      pb.collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY).create({
+        user: userId,
+        effective_from: effectiveFrom,
+        kcal,
+      }),
+    COLLECTIONS.KCAL_GOAL_HISTORY,
+  ).pipe(Effect.map(toKcalGoalChange))
 }
 
-export async function saveCalorieEntryRecord(
+export function saveCalorieEntryRecord(
   userId: string,
   date: string,
   patch: Partial<Pick<CalorieEntry, 'calories' | 'goalOverrideKcal' | 'note'>>,
   existing?: CalorieEntry,
-): Promise<CalorieEntry> {
+) {
   if (existing) {
     const updated = { ...existing, ...patch }
-    await pb.collection(COLLECTIONS.CALORIE_ENTRIES).update(existing.id, {
-      calories: updated.calories,
-      goal_override_kcal: updated.goalOverrideKcal ?? null,
-      note: updated.note ?? '',
-    })
-    return updated
+    return fromPbPromise(
+      (pb) =>
+        pb.collection(COLLECTIONS.CALORIE_ENTRIES).update(existing.id, {
+          calories: updated.calories,
+          goal_override_kcal: updated.goalOverrideKcal ?? null,
+          note: updated.note ?? '',
+        }),
+      COLLECTIONS.CALORIE_ENTRIES,
+    ).pipe(Effect.as(updated))
   }
 
   const newEntry = { date, calories: null, ...patch }
-  const record = await pb.collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES).create({
-    user: userId,
-    date,
-    calories: newEntry.calories,
-    goal_override_kcal: newEntry.goalOverrideKcal ?? null,
-    note: newEntry.note ?? '',
-  })
-  return toCalorieEntry(record)
+  return fromPbPromise(
+    (pb) =>
+      pb.collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES).create({
+        user: userId,
+        date,
+        calories: newEntry.calories,
+        goal_override_kcal: newEntry.goalOverrideKcal ?? null,
+        note: newEntry.note ?? '',
+      }),
+    COLLECTIONS.CALORIE_ENTRIES,
+  ).pipe(Effect.map(toCalorieEntry))
 }
 
-export async function deleteCalorieEntryRecord(id: string): Promise<void> {
-  await pb.collection(COLLECTIONS.CALORIE_ENTRIES).delete(id)
+export function deleteCalorieEntryRecord(id: string) {
+  return fromPbPromise(
+    (pb) => pb.collection(COLLECTIONS.CALORIE_ENTRIES).delete(id),
+    COLLECTIONS.CALORIE_ENTRIES,
+  ).pipe(Effect.asVoid)
 }
 
-export async function resetWeightUserData(userId: string): Promise<void> {
+export function resetWeightUserData(userId: string) {
   const userFilter = pb.filter('user = {:userId}', { userId })
 
-  const [
-    weightRecords,
-    calorieRecords,
-    kcalGoalRecords,
-    goalRecords,
-    foodItemRecords,
-    foodLogRecords,
-  ] = await Promise.all([
-    pb
-      .collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES)
-      .getFullList({ filter: userFilter }),
-    pb
-      .collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES)
-      .getFullList({ filter: userFilter }),
-    pb
-      .collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY)
-      .getFullList({ filter: userFilter }),
-    pb.collection<GoalRecord>(COLLECTIONS.GOALS).getFullList({ filter: userFilter }),
-    pb.collection(COLLECTIONS.FOOD_ITEMS).getFullList({ filter: userFilter }),
-    pb.collection(COLLECTIONS.FOOD_LOG).getFullList({ filter: userFilter }),
-  ])
-
-  await Promise.all(
-    foodLogRecords.map((record) => pb.collection(COLLECTIONS.FOOD_LOG).delete(record.id)),
-  )
-
-  await Promise.all([
-    ...weightRecords.map((record) => pb.collection(COLLECTIONS.WEIGHT_ENTRIES).delete(record.id)),
-    ...calorieRecords.map((record) => pb.collection(COLLECTIONS.CALORIE_ENTRIES).delete(record.id)),
-    ...kcalGoalRecords.map((record) =>
-      pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).delete(record.id),
+  return Effect.all(
+    {
+      weightRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<WeightEntryRecord>(COLLECTIONS.WEIGHT_ENTRIES).getFullList({
+            filter: userFilter,
+          }),
+        COLLECTIONS.WEIGHT_ENTRIES,
+      ),
+      calorieRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<CalorieEntryRecord>(COLLECTIONS.CALORIE_ENTRIES).getFullList({
+            filter: userFilter,
+          }),
+        COLLECTIONS.CALORIE_ENTRIES,
+      ),
+      kcalGoalRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<KcalGoalChangeRecord>(COLLECTIONS.KCAL_GOAL_HISTORY).getFullList({
+            filter: userFilter,
+          }),
+        COLLECTIONS.KCAL_GOAL_HISTORY,
+      ),
+      goalRecords: fromPbPromise(
+        (pb) => pb.collection<GoalRecord>(COLLECTIONS.GOALS).getFullList({ filter: userFilter }),
+        COLLECTIONS.GOALS,
+      ),
+      foodItemRecords: fromPbPromise(
+        (pb) => pb.collection(COLLECTIONS.FOOD_ITEMS).getFullList({ filter: userFilter }),
+        COLLECTIONS.FOOD_ITEMS,
+      ),
+      foodLogRecords: fromPbPromise(
+        (pb) => pb.collection(COLLECTIONS.FOOD_LOG).getFullList({ filter: userFilter }),
+        COLLECTIONS.FOOD_LOG,
+      ),
+    },
+    { concurrency: 'unbounded' },
+  ).pipe(
+    Effect.flatMap(
+      ({
+        weightRecords,
+        calorieRecords,
+        kcalGoalRecords,
+        goalRecords,
+        foodItemRecords,
+        foodLogRecords,
+      }) =>
+        Effect.all(
+          foodLogRecords.map((record) =>
+            fromPbPromise(
+              (pb) => pb.collection(COLLECTIONS.FOOD_LOG).delete(record.id),
+              COLLECTIONS.FOOD_LOG,
+            ),
+          ),
+          { concurrency: 'unbounded' },
+        ).pipe(
+          Effect.flatMap(() =>
+            Effect.all(
+              [
+                ...weightRecords.map((record) =>
+                  fromPbPromise(
+                    (pb) => pb.collection(COLLECTIONS.WEIGHT_ENTRIES).delete(record.id),
+                    COLLECTIONS.WEIGHT_ENTRIES,
+                  ),
+                ),
+                ...calorieRecords.map((record) =>
+                  fromPbPromise(
+                    (pb) => pb.collection(COLLECTIONS.CALORIE_ENTRIES).delete(record.id),
+                    COLLECTIONS.CALORIE_ENTRIES,
+                  ),
+                ),
+                ...kcalGoalRecords.map((record) =>
+                  fromPbPromise(
+                    (pb) => pb.collection(COLLECTIONS.KCAL_GOAL_HISTORY).delete(record.id),
+                    COLLECTIONS.KCAL_GOAL_HISTORY,
+                  ),
+                ),
+                ...goalRecords.map((record) =>
+                  fromPbPromise(
+                    (pb) => pb.collection(COLLECTIONS.GOALS).delete(record.id),
+                    COLLECTIONS.GOALS,
+                  ),
+                ),
+                ...foodItemRecords.map((record) =>
+                  fromPbPromise(
+                    (pb) => pb.collection(COLLECTIONS.FOOD_ITEMS).delete(record.id),
+                    COLLECTIONS.FOOD_ITEMS,
+                  ),
+                ),
+              ],
+              { concurrency: 'unbounded' },
+            ),
+          ),
+        ),
     ),
-    ...goalRecords.map((record) => pb.collection(COLLECTIONS.GOALS).delete(record.id)),
-    ...foodItemRecords.map((record) => pb.collection(COLLECTIONS.FOOD_ITEMS).delete(record.id)),
-  ])
+    Effect.asVoid,
+  )
 }

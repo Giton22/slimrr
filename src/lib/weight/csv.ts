@@ -1,3 +1,6 @@
+import { Effect } from 'effect'
+import { fromPbPromise } from '@/lib/effect'
+import { NetworkError, UnknownPbError } from '@/lib/effect/errors'
 import { pb, pocketbaseUrl } from '@/lib/pocketbase'
 
 export type CsvDataType = 'weight' | 'calories' | 'food_log'
@@ -16,22 +19,26 @@ export interface CsvImportResult {
   errors: CsvImportError[]
 }
 
-export async function importCsvData(type: CsvDataType, file: File): Promise<CsvImportResult> {
+export function importCsvData(type: CsvDataType, file: File) {
   const formData = new FormData()
   formData.append('type', type)
   formData.append('file', file)
 
-  return pb.send<CsvImportResult>('/api/data/import/csv', {
-    method: 'POST',
-    body: formData,
-  })
+  return fromPbPromise(
+    (pb) =>
+      pb.send<CsvImportResult>('/api/data/import/csv', {
+        method: 'POST',
+        body: formData,
+      }),
+    'csv_import',
+  )
 }
 
-export async function exportCsvData(
+export function exportCsvData(
   type: CsvDataType,
   authToken = pb.authStore.token,
   fetchFn: typeof fetch = fetch,
-): Promise<{ filename: string; blob: Blob }> {
+) {
   const url = new URL('/api/data/export/csv', pocketbaseUrl)
   url.searchParams.set('type', type)
 
@@ -40,20 +47,48 @@ export async function exportCsvData(
     headers.Authorization = `Bearer ${authToken}`
   }
 
-  const response = await fetchFn(url.toString(), {
-    method: 'GET',
-    headers,
-  })
+  return Effect.tryPromise({
+    try: () =>
+      fetchFn(url.toString(), {
+        method: 'GET',
+        headers,
+      }),
+    catch: (cause) =>
+      new NetworkError({
+        message: 'Export failed',
+        collection: 'csv_export',
+        cause,
+      }),
+  }).pipe(
+    Effect.flatMap((response) => {
+      if (!response.ok) {
+        return Effect.fail(
+          new UnknownPbError({
+            message: `Export failed (${response.status})`,
+            collection: 'csv_export',
+            status: response.status,
+            cause: response,
+          }),
+        )
+      }
 
-  if (!response.ok) {
-    throw new Error('Export failed')
-  }
+      return Effect.tryPromise({
+        try: async () => {
+          const blob = await response.blob()
+          const disposition = response.headers.get('content-disposition')
+          const filename = extractFilenameFromDisposition(disposition) ?? `${type}.csv`
 
-  const blob = await response.blob()
-  const disposition = response.headers.get('content-disposition')
-  const filename = extractFilenameFromDisposition(disposition) ?? `${type}.csv`
-
-  return { filename, blob }
+          return { filename, blob }
+        },
+        catch: (cause) =>
+          new UnknownPbError({
+            message: 'Failed to read export response',
+            collection: 'csv_export',
+            cause,
+          }),
+      })
+    }),
+  )
 }
 
 export function extractFilenameFromDisposition(disposition: string | null): string | null {

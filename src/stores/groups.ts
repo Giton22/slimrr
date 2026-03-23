@@ -1,6 +1,8 @@
+import { Effect } from 'effect'
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { Goal, Group, GroupMember } from '@/types'
+import { fromPbPromise, runPb } from '@/lib/effect'
 import { pb, COLLECTIONS } from '@/lib/pocketbase'
 import { kgToLbs } from '@/composables/useUnits'
 import type {
@@ -63,20 +65,6 @@ function generateInviteCode(): string {
   return code
 }
 
-function isNotFoundError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  const candidate = error as {
-    status?: number
-    message?: string
-    originalError?: { message?: string }
-  }
-  return (
-    candidate.status === 404 ||
-    candidate.message?.includes('not found') === true ||
-    candidate.originalError?.message?.includes('no rows in result set') === true
-  )
-}
-
 // ── Store ──
 
 export const useGroupsStore = defineStore('groups', () => {
@@ -97,12 +85,16 @@ export const useGroupsStore = defineStore('groups', () => {
 
     isLoading.value = true
     try {
-      const memberRecords = await pb
-        .collection<GroupMemberWithGroupExpand>(COLLECTIONS.GROUP_MEMBERS)
-        .getFullList({
-          filter: pb.filter('user = {:userId}', { userId }),
-          expand: 'group',
-        })
+      const memberRecords = await runPb(
+        fromPbPromise(
+          (pb) =>
+            pb.collection<GroupMemberWithGroupExpand>(COLLECTIONS.GROUP_MEMBERS).getFullList({
+              filter: pb.filter('user = {:userId}', { userId }),
+              expand: 'group',
+            }),
+          COLLECTIONS.GROUP_MEMBERS,
+        ),
+      )
 
       myGroups.value = memberRecords
         .map((r) => {
@@ -118,17 +110,25 @@ export const useGroupsStore = defineStore('groups', () => {
   async function loadGroupDetail(groupId: string) {
     isLoading.value = true
     try {
-      // Fetch group
-      const groupRec = await pb.collection<GroupRecord>(COLLECTIONS.GROUPS).getOne(groupId)
+      const [groupRec, memberRecords] = await Promise.all([
+        runPb(
+          fromPbPromise(
+            (pb) => pb.collection<GroupRecord>(COLLECTIONS.GROUPS).getOne(groupId),
+            COLLECTIONS.GROUPS,
+          ),
+        ),
+        runPb(
+          fromPbPromise(
+            (pb) =>
+              pb.collection<GroupMemberWithUserExpand>(COLLECTIONS.GROUP_MEMBERS).getFullList({
+                filter: pb.filter('group = {:groupId}', { groupId }),
+                expand: 'user',
+              }),
+            COLLECTIONS.GROUP_MEMBERS,
+          ),
+        ),
+      ])
       currentGroup.value = toGroup(groupRec)
-
-      // Fetch members with user expand
-      const memberRecords = await pb
-        .collection<GroupMemberWithUserExpand>(COLLECTIONS.GROUP_MEMBERS)
-        .getFullList({
-          filter: pb.filter('group = {:groupId}', { groupId }),
-          expand: 'user',
-        })
       currentMembers.value = memberRecords.map(toGroupMember)
 
       // Fetch group-visible goals for all members
@@ -138,10 +138,19 @@ export const useGroupsStore = defineStore('groups', () => {
         const params: Record<string, string> = Object.fromEntries(
           memberIds.map((id, i) => [`uid${i}`, id]),
         )
-        const goalRecords = await pb.collection<GoalRecord>(COLLECTIONS.GOALS).getFullList({
-          filter: pb.filter(`(${conditions.join(' || ')}) && visibility != "private"`, params),
-          sort: '-updated',
-        })
+        const goalRecords = await runPb(
+          fromPbPromise(
+            (pb) =>
+              pb.collection<GoalRecord>(COLLECTIONS.GOALS).getFullList({
+                filter: pb.filter(
+                  `(${conditions.join(' || ')}) && visibility != "private"`,
+                  params,
+                ),
+                sort: '-updated',
+              }),
+            COLLECTIONS.GOALS,
+          ),
+        )
         currentGoals.value = goalRecords.map(toGoal)
       } else {
         currentGoals.value = []
@@ -159,18 +168,30 @@ export const useGroupsStore = defineStore('groups', () => {
 
     const inviteCode = generateInviteCode()
 
-    const groupRec = await pb.collection<GroupRecord>(COLLECTIONS.GROUPS).create({
-      name,
-      description: description ?? '',
-      invite_code: inviteCode,
-      created_by: userId,
-    })
+    const groupRec = await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb.collection<GroupRecord>(COLLECTIONS.GROUPS).create({
+            name,
+            description: description ?? '',
+            invite_code: inviteCode,
+            created_by: userId,
+          }),
+        COLLECTIONS.GROUPS,
+      ),
+    )
 
-    await pb.collection(COLLECTIONS.GROUP_MEMBERS).create({
-      group: groupRec.id,
-      user: userId,
-      role: 'owner',
-    })
+    await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb.collection(COLLECTIONS.GROUP_MEMBERS).create({
+            group: groupRec.id,
+            user: userId,
+            role: 'owner',
+          }),
+        COLLECTIONS.GROUP_MEMBERS,
+      ),
+    )
 
     myGroups.value.push(toGroup(groupRec))
     return toGroup(groupRec)
@@ -180,28 +201,46 @@ export const useGroupsStore = defineStore('groups', () => {
     const userId = pb.authStore.record?.id
     if (!userId) throw new Error('Not authenticated')
 
-    const groupRec = await pb
-      .collection<GroupRecord>(COLLECTIONS.GROUPS)
-      .getFirstListItem(pb.filter('invite_code = {:code}', { code: code.toUpperCase() }))
+    const groupRec = await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb
+            .collection<GroupRecord>(COLLECTIONS.GROUPS)
+            .getFirstListItem(pb.filter('invite_code = {:code}', { code: code.toUpperCase() })),
+        COLLECTIONS.GROUPS,
+      ),
+    )
 
     // Check if already a member
-    try {
-      await pb
-        .collection(COLLECTIONS.GROUP_MEMBERS)
-        .getFirstListItem(
-          pb.filter('group = {:groupId} && user = {:userId}', { groupId: groupRec.id, userId }),
-        )
+    const existingMembership = await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb
+            .collection(COLLECTIONS.GROUP_MEMBERS)
+            .getFirstListItem(
+              pb.filter('group = {:groupId} && user = {:userId}', { groupId: groupRec.id, userId }),
+            ),
+        COLLECTIONS.GROUP_MEMBERS,
+      ).pipe(
+        Effect.map(() => true),
+        Effect.catchTag('NotFoundError', () => Effect.succeed(false)),
+      ),
+    )
+    if (existingMembership) {
       throw new Error('You are already a member of this group')
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message === 'You are already a member of this group') throw e
-      // 404 means not a member yet — continue
     }
 
-    await pb.collection(COLLECTIONS.GROUP_MEMBERS).create({
-      group: groupRec.id,
-      user: userId,
-      role: 'member',
-    })
+    await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb.collection(COLLECTIONS.GROUP_MEMBERS).create({
+            group: groupRec.id,
+            user: userId,
+            role: 'member',
+          }),
+        COLLECTIONS.GROUP_MEMBERS,
+      ),
+    )
 
     const group = toGroup(groupRec)
     myGroups.value.push(group)
@@ -212,10 +251,23 @@ export const useGroupsStore = defineStore('groups', () => {
     const userId = pb.authStore.record?.id
     if (!userId) return
 
-    const membership = await pb
-      .collection<GroupMemberRecord>(COLLECTIONS.GROUP_MEMBERS)
-      .getFirstListItem(pb.filter('group = {:groupId} && user = {:userId}', { groupId, userId }))
-    await pb.collection(COLLECTIONS.GROUP_MEMBERS).delete(membership.id)
+    const membership = await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb
+            .collection<GroupMemberRecord>(COLLECTIONS.GROUP_MEMBERS)
+            .getFirstListItem(
+              pb.filter('group = {:groupId} && user = {:userId}', { groupId, userId }),
+            ),
+        COLLECTIONS.GROUP_MEMBERS,
+      ),
+    )
+    await runPb(
+      fromPbPromise(
+        (pb) => pb.collection(COLLECTIONS.GROUP_MEMBERS).delete(membership.id),
+        COLLECTIONS.GROUP_MEMBERS,
+      ),
+    )
     myGroups.value = myGroups.value.filter((g) => g.id !== groupId)
 
     if (currentGroup.value?.id === groupId) {
@@ -226,7 +278,9 @@ export const useGroupsStore = defineStore('groups', () => {
   }
 
   async function deleteGroup(groupId: string) {
-    await pb.collection(COLLECTIONS.GROUPS).delete(groupId)
+    await runPb(
+      fromPbPromise((pb) => pb.collection(COLLECTIONS.GROUPS).delete(groupId), COLLECTIONS.GROUPS),
+    )
     myGroups.value = myGroups.value.filter((g) => g.id !== groupId)
 
     if (currentGroup.value?.id === groupId) {
@@ -251,17 +305,19 @@ export const useGroupsStore = defineStore('groups', () => {
 
     try {
       if (!weightGoalId) {
-        // Try to find existing weight goal
-        try {
-          const existing = await pb
-            .collection<GoalRecord>(COLLECTIONS.GOALS)
-            .getFirstListItem(
-              pb.filter('user = {:userId} && title = {:title}', { userId, title: 'Weight Goal' }),
-            )
-          weightGoalId = existing.id
-        } catch {
-          // No existing goal — will create below
-        }
+        const existing = await runPb(
+          fromPbPromise(
+            (pb) =>
+              pb.collection<GoalRecord>(COLLECTIONS.GOALS).getFirstListItem(
+                pb.filter('user = {:userId} && title = {:title}', {
+                  userId,
+                  title: 'Weight Goal',
+                }),
+              ),
+            COLLECTIONS.GOALS,
+          ).pipe(Effect.catchTag('NotFoundError', () => Effect.succeed(null))),
+        )
+        weightGoalId = existing?.id ?? null
       }
 
       const payload = {
@@ -277,24 +333,33 @@ export const useGroupsStore = defineStore('groups', () => {
       }
 
       if (weightGoalId) {
-        try {
-          const rec = await pb
-            .collection<GoalRecord>(COLLECTIONS.GOALS)
-            .update(weightGoalId, payload)
-          const updated = toGoal(rec)
+        const updatedGoal = await runPb(
+          fromPbPromise(
+            (pb) => pb.collection<GoalRecord>(COLLECTIONS.GOALS).update(weightGoalId!, payload),
+            COLLECTIONS.GOALS,
+          ).pipe(
+            Effect.map((rec) => ({ kind: 'updated' as const, rec })),
+            Effect.catchTag('NotFoundError', () => Effect.succeed({ kind: 'missing' as const })),
+          ),
+        )
+
+        if (updatedGoal.kind === 'updated') {
+          const updated = toGoal(updatedGoal.rec)
           const idx = currentGoals.value.findIndex((g) => g.id === weightGoalId)
           if (idx !== -1) currentGoals.value[idx] = updated
           return
-        } catch (error) {
-          if (!isNotFoundError(error)) throw error
-          currentGoals.value = currentGoals.value.filter((g) => g.id !== weightGoalId)
-          weightGoalId = null
         }
-      } else {
-        // fall through to create below
+
+        currentGoals.value = currentGoals.value.filter((g) => g.id !== weightGoalId)
+        weightGoalId = null
       }
 
-      const rec = await pb.collection<GoalRecord>(COLLECTIONS.GOALS).create(payload)
+      const rec = await runPb(
+        fromPbPromise(
+          (pb) => pb.collection<GoalRecord>(COLLECTIONS.GOALS).create(payload),
+          COLLECTIONS.GOALS,
+        ),
+      )
       weightGoalId = rec.id
       const goal = toGoal(rec)
       currentGoals.value = [goal, ...currentGoals.value.filter((g) => g.id !== goal.id)]

@@ -1,4 +1,6 @@
+import { Effect } from 'effect'
 import type { FoodFavorite, FoodFrequent, FoodItem, FoodLogEntry, FoodRecent } from '@/types'
+import { fromPbPromise } from '@/lib/effect'
 import { COLLECTIONS, pb } from '@/lib/pocketbase'
 import type {
   FoodFavoriteRecord,
@@ -99,92 +101,129 @@ export interface LoadedFoodDashboardData {
   frequent: FoodFrequent[]
 }
 
-export async function loadFoodDashboardRepositoryData(
-  userId: string,
-  lookbackDays = 365,
-): Promise<LoadedFoodDashboardData> {
+export function loadFoodDashboardRepositoryData(userId: string, lookbackDays = 365) {
   const userFilter = pb.filter('user = {:userId}', { userId })
   const dateBoundFilter = pb.filter('user = {:userId} && date >= {:cutoff}', {
     userId,
     cutoff: cutoffISO(lookbackDays),
   })
 
-  const [itemRecords, logRecords, favoriteRecords, recentRecords, frequentRecords] =
-    await Promise.all([
-      pb
-        .collection<FoodItemRecord>(COLLECTIONS.FOOD_ITEMS)
-        .getFullList({ filter: userFilter, sort: 'name' }),
-      pb
-        .collection<FoodLogRecord>(COLLECTIONS.FOOD_LOG)
-        .getFullList({ filter: dateBoundFilter, sort: 'date' }),
-      pb
-        .collection<FoodFavoriteRecord>(COLLECTIONS.FOOD_FAVORITES)
-        .getFullList({ filter: userFilter }),
-      pb
-        .collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS)
-        .getFullList({ filter: userFilter, sort: '-last_logged_at' }),
-      pb
-        .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
-        .getFullList({ filter: userFilter, sort: '-times_logged,-last_logged_at' }),
-    ])
-
-  return {
-    foodItems: itemRecords.map(toFoodItem),
-    foodLog: logRecords.map(toFoodLogEntry),
-    favorites: favoriteRecords.map(toFoodFavorite),
-    recents: recentRecords.map(toFoodRecent),
-    frequent: frequentRecords.map(toFoodFrequent),
-  }
+  return Effect.all(
+    {
+      itemRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<FoodItemRecord>(COLLECTIONS.FOOD_ITEMS).getFullList({
+            filter: userFilter,
+            sort: 'name',
+          }),
+        COLLECTIONS.FOOD_ITEMS,
+      ),
+      logRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<FoodLogRecord>(COLLECTIONS.FOOD_LOG).getFullList({
+            filter: dateBoundFilter,
+            sort: 'date',
+          }),
+        COLLECTIONS.FOOD_LOG,
+      ),
+      favoriteRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<FoodFavoriteRecord>(COLLECTIONS.FOOD_FAVORITES).getFullList({
+            filter: userFilter,
+          }),
+        COLLECTIONS.FOOD_FAVORITES,
+      ),
+      recentRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS).getFullList({
+            filter: userFilter,
+            sort: '-last_logged_at',
+          }),
+        COLLECTIONS.FOOD_RECENTS,
+      ),
+      frequentRecords: fromPbPromise(
+        (pb) =>
+          pb.collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT).getFullList({
+            filter: userFilter,
+            sort: '-times_logged,-last_logged_at',
+          }),
+        COLLECTIONS.FOOD_FREQUENT,
+      ),
+    },
+    { concurrency: 'unbounded' },
+  ).pipe(
+    Effect.map(({ itemRecords, logRecords, favoriteRecords, recentRecords, frequentRecords }) => ({
+      foodItems: itemRecords.map(toFoodItem),
+      foodLog: logRecords.map(toFoodLogEntry),
+      favorites: favoriteRecords.map(toFoodFavorite),
+      recents: recentRecords.map(toFoodRecent),
+      frequent: frequentRecords.map(toFoodFrequent),
+    })),
+  )
 }
 
-export async function checkVisionConfiguration(): Promise<boolean> {
-  const result = await pb.send<{ configured: boolean }>('/api/food/label/status', {
-    method: 'GET',
-  })
-  return result.configured
+export function checkVisionConfiguration() {
+  return fromPbPromise(
+    (pb) =>
+      pb.send<{ configured: boolean }>('/api/food/label/status', {
+        method: 'GET',
+      }),
+    'food_label_status',
+  ).pipe(Effect.map((result) => result.configured))
 }
 
-export async function parseNutritionLabelImage(imageFile: File): Promise<OFFSearchResult> {
+export function parseNutritionLabelImage(imageFile: File) {
   const formData = new FormData()
   formData.append('image', imageFile)
-  return pb.send<OFFSearchResult>('/api/food/label', {
-    method: 'POST',
-    body: formData,
-  })
+  return fromPbPromise(
+    (pb) =>
+      pb.send<OFFSearchResult>('/api/food/label', {
+        method: 'POST',
+        body: formData,
+      }),
+    'food_label',
+  )
 }
 
-export async function searchFoodDatabase(query: string): Promise<OFFSearchResult[]> {
-  return pb.send<OFFSearchResult[]>('/api/food/search', {
-    method: 'GET',
-    query: { q: query },
-  })
+export function searchFoodDatabase(query: string) {
+  return fromPbPromise(
+    (pb) =>
+      pb.send<OFFSearchResult[]>('/api/food/search', {
+        method: 'GET',
+        query: { q: query },
+      }),
+    'food_search',
+  )
 }
 
-export async function lookupFoodBarcode(code: string): Promise<OFFSearchResult> {
-  return pb.send<OFFSearchResult>(`/api/food/barcode/${encodeURIComponent(code)}`, {
-    method: 'GET',
-  })
+export function lookupFoodBarcode(code: string) {
+  return fromPbPromise(
+    (pb) =>
+      pb.send<OFFSearchResult>(`/api/food/barcode/${encodeURIComponent(code)}`, {
+        method: 'GET',
+      }),
+    'food_barcode',
+  )
 }
 
-export async function createFoodItemRecord(
-  userId: string,
-  item: Omit<FoodItem, 'id'>,
-): Promise<FoodItem> {
-  const record = await pb.collection<FoodItemRecord>(COLLECTIONS.FOOD_ITEMS).create({
-    user: userId,
-    name: item.name,
-    brand: item.brand ?? '',
-    barcode: item.barcode ?? '',
-    calories_per_100g: item.caloriesPer100g,
-    protein_per_100g: item.proteinPer100g ?? 0,
-    carbs_per_100g: item.carbsPer100g ?? 0,
-    fat_per_100g: item.fatPer100g ?? 0,
-    default_serving_g: item.defaultServingG || 100,
-    source: item.source,
-    off_id: item.offId ?? '',
-  })
-
-  return toFoodItem(record)
+export function createFoodItemRecord(userId: string, item: Omit<FoodItem, 'id'>) {
+  return fromPbPromise(
+    (pb) =>
+      pb.collection<FoodItemRecord>(COLLECTIONS.FOOD_ITEMS).create({
+        user: userId,
+        name: item.name,
+        brand: item.brand ?? '',
+        barcode: item.barcode ?? '',
+        calories_per_100g: item.caloriesPer100g,
+        protein_per_100g: item.proteinPer100g ?? 0,
+        carbs_per_100g: item.carbsPer100g ?? 0,
+        fat_per_100g: item.fatPer100g ?? 0,
+        default_serving_g: item.defaultServingG || 100,
+        source: item.source,
+        off_id: item.offId ?? '',
+      }),
+    COLLECTIONS.FOOD_ITEMS,
+  ).pipe(Effect.map(toFoodItem))
 }
 
 export interface FoodRealtimeHandlers {

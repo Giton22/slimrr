@@ -74,3 +74,18 @@ These commands map to their corresponding tools. For example, `vp dev --port 300
 - [ ] Run `vp install` after pulling remote changes and before getting started.
 - [ ] Run `vp check` and `vp test` to validate changes.
 <!--VITE PLUS END-->
+
+## btca
+
+When you need up-to-date information about technologies used in this project,
+use btca to query source repositories directly.
+
+**Available resources**: vue, vueRouter, pinia, tailwind, vite, pocketbase, rekaUi, vueuse, effect
+
+### Usage
+
+```
+btca ask -r <resource> -q "<question>"
+```
+
+Use multiple `-r` flags to query multiple resources at once.

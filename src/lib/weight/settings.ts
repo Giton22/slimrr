@@ -1,6 +1,8 @@
+import { Effect } from 'effect'
 import type { GoalDirection, Sex, UserSettings } from '@/types'
-import { COLLECTIONS, pb } from '@/lib/pocketbase'
+import { COLLECTIONS } from '@/lib/pocketbase'
 import type { UserSettingsRecord } from '@/lib/pocketbase'
+import { fromPbPromise } from '@/lib/effect'
 
 export function createDefaultUserSettings(): UserSettings {
   return {
@@ -44,11 +46,11 @@ export function toUserSettings(record: UserSettingsRecord): UserSettings {
   }
 }
 
-export async function saveUserSettings(
+export function saveUserSettings(
   userId: string,
   settings: UserSettings,
   settingsRecordId: string | null,
-): Promise<string> {
+) {
   const payload = {
     user: userId,
     unit: settings.unit,
@@ -63,22 +65,30 @@ export async function saveUserSettings(
     dashboard_layout: JSON.stringify(settings.dashboardLayout ?? []),
   }
 
-  const recordId = settingsRecordId ?? (await findLatestUserSettingsRecordId(userId))
-  if (recordId) {
-    await pb.collection(COLLECTIONS.USER_SETTINGS).update(recordId, payload)
-    return recordId
-  }
+  return Effect.flatMap(
+    settingsRecordId ? Effect.succeed(settingsRecordId) : findLatestUserSettingsRecordId(userId),
+    (recordId) => {
+      if (recordId) {
+        return fromPbPromise(
+          (pb) => pb.collection(COLLECTIONS.USER_SETTINGS).update(recordId, payload),
+          COLLECTIONS.USER_SETTINGS,
+        ).pipe(Effect.as(recordId))
+      }
 
-  const record = await pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).create(payload)
-  return record.id
+      return fromPbPromise(
+        (pb) => pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).create(payload),
+        COLLECTIONS.USER_SETTINGS,
+      ).pipe(Effect.map((record) => record.id))
+    },
+  )
 }
 
-async function findLatestUserSettingsRecordId(userId: string): Promise<string | null> {
-  const existingSettings = await pb
-    .collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS)
-    .getFullList({
-      filter: pb.filter('user = {:userId}', { userId }),
-    })
-
-  return existingSettings[0]?.id ?? null
+function findLatestUserSettingsRecordId(userId: string) {
+  return fromPbPromise(
+    (pb) =>
+      pb.collection<UserSettingsRecord>(COLLECTIONS.USER_SETTINGS).getFullList({
+        filter: pb.filter('user = {:userId}', { userId }),
+      }),
+    COLLECTIONS.USER_SETTINGS,
+  ).pipe(Effect.map((existingSettings) => existingSettings[0]?.id ?? null))
 }

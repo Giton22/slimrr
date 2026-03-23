@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
@@ -9,6 +10,7 @@ import type {
   UserSettings,
   WeightEntry,
 } from '@/types'
+import { runPb, UnknownPbError } from '@/lib/effect'
 import { pb } from '@/lib/pocketbase'
 import { todayISO } from '@/lib/date'
 import { today } from '@/composables/useToday'
@@ -88,7 +90,7 @@ export const useWeightStore = defineStore('weight', () => {
       const userId = pb.authStore.record?.id
       if (!userId) return
 
-      const data = await loadWeightStoreData(userId)
+      const data = await runPb(loadWeightStoreData(userId))
       entries.value = data.entries
       calorieEntries.value = data.calorieEntries
       kcalGoalHistory.value = data.kcalGoalHistory
@@ -174,7 +176,7 @@ export const useWeightStore = defineStore('weight', () => {
 
     const next = { ...settings.value, ...patch }
     settings.value = next
-    settingsRecordId.value = await saveUserSettings(userId, next, settingsRecordId.value)
+    settingsRecordId.value = await runPb(saveUserSettings(userId, next, settingsRecordId.value))
 
     // Sync weight goal for groups when goal weight changes
     const sorted = [...entries.value].sort((a, b) => a.date.localeCompare(b.date))
@@ -276,20 +278,34 @@ export const useWeightStore = defineStore('weight', () => {
 
     const existing = entries.value.find((e) => e.date === entry.date)
 
-    try {
-      const savedEntry = await saveWeightEntryRecord(userId, entry, existing)
-      if (existing) {
-        const idx = entries.value.findIndex((e) => e.id === existing.id)
-        if (idx !== -1) entries.value[idx] = savedEntry
-      } else if (!entries.value.some((e) => e.id === savedEntry.id)) {
-        entries.value.push(savedEntry)
-      }
-    } catch {
-      if (!existing) {
-        toast.error('Failed to save weight entry. Please try again.')
-      } else {
-        throw new Error('Failed to update weight entry')
-      }
+    const savedEntry = await runPb(
+      saveWeightEntryRecord(userId, entry, existing).pipe(
+        Effect.catchTag('UnknownPbError', () => {
+          if (!existing) {
+            return Effect.sync(() => {
+              toast.error('Failed to save weight entry. Please try again.')
+              return null
+            })
+          }
+
+          return Effect.fail(
+            new UnknownPbError({
+              message: 'Failed to update weight entry',
+              collection: 'weight_entries',
+              cause: new Error('Failed to update weight entry'),
+            }),
+          )
+        }),
+      ),
+    )
+
+    if (!savedEntry) return
+
+    if (existing) {
+      const idx = entries.value.findIndex((e) => e.id === existing.id)
+      if (idx !== -1) entries.value[idx] = savedEntry
+    } else if (!entries.value.some((e) => e.id === savedEntry.id)) {
+      entries.value.push(savedEntry)
     }
 
     // Sync weight goal for groups
@@ -307,13 +323,13 @@ export const useWeightStore = defineStore('weight', () => {
     const existing = entries.value.find((e) => e.id === id)
     if (!existing) return
 
-    await patchWeightEntryRecord(id, patch)
+    await runPb(patchWeightEntryRecord(id, patch))
     const idx = entries.value.findIndex((e) => e.id === id)
     if (idx !== -1) entries.value[idx] = { ...existing, ...patch }
   }
 
   async function deleteEntry(id: string) {
-    await deleteWeightEntryRecord(id)
+    await runPb(deleteWeightEntryRecord(id))
     entries.value = entries.value.filter((e) => e.id !== id)
   }
 
@@ -350,21 +366,35 @@ export const useWeightStore = defineStore('weight', () => {
     const today = todayISO()
 
     const existing = kcalGoalHistory.value.find((goal) => goal.effectiveFrom === today)
-    try {
-      const savedGoal = await saveGlobalKcalGoalRecord(userId, today, kcal, existing)
-      if (existing) {
-        kcalGoalHistory.value = kcalGoalHistory.value.map((goal) =>
-          goal.effectiveFrom === today ? savedGoal : goal,
-        )
-      } else if (!kcalGoalHistory.value.some((goal) => goal.id === savedGoal.id)) {
-        kcalGoalHistory.value.push(savedGoal)
-      }
-    } catch {
-      if (!existing) {
-        toast.error('Failed to set calorie goal. Please try again.')
-      } else {
-        throw new Error('Failed to update calorie goal')
-      }
+    const savedGoal = await runPb(
+      saveGlobalKcalGoalRecord(userId, today, kcal, existing).pipe(
+        Effect.catchTag('UnknownPbError', () => {
+          if (!existing) {
+            return Effect.sync(() => {
+              toast.error('Failed to set calorie goal. Please try again.')
+              return null
+            })
+          }
+
+          return Effect.fail(
+            new UnknownPbError({
+              message: 'Failed to update calorie goal',
+              collection: 'kcal_goal_history',
+              cause: new Error('Failed to update calorie goal'),
+            }),
+          )
+        }),
+      ),
+    )
+
+    if (!savedGoal) return
+
+    if (existing) {
+      kcalGoalHistory.value = kcalGoalHistory.value.map((goal) =>
+        goal.effectiveFrom === today ? savedGoal : goal,
+      )
+    } else if (!kcalGoalHistory.value.some((goal) => goal.id === savedGoal.id)) {
+      kcalGoalHistory.value.push(savedGoal)
     }
   }
 
@@ -377,25 +407,34 @@ export const useWeightStore = defineStore('weight', () => {
 
     const existing = calorieEntries.value.find((entry) => entry.date === date)
 
-    try {
-      const savedEntry = await saveCalorieEntryRecord(userId, date, patch, existing)
-      if (existing) {
-        const idx = calorieEntries.value.findIndex((entry) => entry.date === date)
-        if (idx !== -1) calorieEntries.value[idx] = savedEntry
-      } else if (!calorieEntries.value.some((entry) => entry.id === savedEntry.id)) {
-        calorieEntries.value.push(savedEntry)
-      }
-    } catch {
-      try {
-        if (!existing) {
-          toast.error('Failed to save calorie entry. Please try again.')
-          return
-        }
-        throw new Error('Failed to update calorie entry')
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Failed to update calorie entry')
-          throw error
-      }
+    const savedEntry = await runPb(
+      saveCalorieEntryRecord(userId, date, patch, existing).pipe(
+        Effect.catchTag('UnknownPbError', () => {
+          if (!existing) {
+            return Effect.sync(() => {
+              toast.error('Failed to save calorie entry. Please try again.')
+              return null
+            })
+          }
+
+          return Effect.fail(
+            new UnknownPbError({
+              message: 'Failed to update calorie entry',
+              collection: 'calorie_entries',
+              cause: new Error('Failed to update calorie entry'),
+            }),
+          )
+        }),
+      ),
+    )
+
+    if (!savedEntry) return
+
+    if (existing) {
+      const idx = calorieEntries.value.findIndex((entry) => entry.date === date)
+      if (idx !== -1) calorieEntries.value[idx] = savedEntry
+    } else if (!calorieEntries.value.some((entry) => entry.id === savedEntry.id)) {
+      calorieEntries.value.push(savedEntry)
     }
   }
 
@@ -425,7 +464,7 @@ export const useWeightStore = defineStore('weight', () => {
     const entry = calorieEntries.value.find((e) => e.date === date)
     if (!entry) return
 
-    await deleteCalorieEntryRecord(entry.id)
+    await runPb(deleteCalorieEntryRecord(entry.id))
     calorieEntries.value = calorieEntries.value.filter((e) => e.date !== date)
   }
 
@@ -433,7 +472,7 @@ export const useWeightStore = defineStore('weight', () => {
     const userId = pb.authStore.record?.id
     if (!userId) return
 
-    await resetWeightUserData(userId)
+    await runPb(resetWeightUserData(userId))
 
     entries.value = []
     calorieEntries.value = []
@@ -442,13 +481,13 @@ export const useWeightStore = defineStore('weight', () => {
   }
 
   async function importCsv(type: CsvDataType, file: File): Promise<CsvImportResult> {
-    const result = await importCsvData(type, file)
+    const result = await runPb(importCsvData(type, file))
     await Promise.all([loadAll(), useFoodStore().loadFoodData()])
     return result
   }
 
   async function exportCsv(type: CsvDataType): Promise<{ filename: string; blob: Blob }> {
-    return exportCsvData(type)
+    return runPb(exportCsvData(type))
   }
 
   return {

@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { Effect } from 'effect'
 
 const {
   checkSetupCompleteMock,
@@ -58,7 +59,7 @@ describe('auth store checkSetup', () => {
 
   it('deduplicates concurrent setup checks', async () => {
     const pendingCheck = deferredPromise<{ setupComplete: boolean }>()
-    checkSetupCompleteMock.mockReturnValueOnce(pendingCheck.promise)
+    checkSetupCompleteMock.mockReturnValueOnce(Effect.tryPromise(() => pendingCheck.promise))
 
     const store = useAuthStore()
     const firstCall = store.checkSetup()
@@ -73,7 +74,7 @@ describe('auth store checkSetup', () => {
   })
 
   it('reuses the cached setup result after the first successful fetch', async () => {
-    checkSetupCompleteMock.mockResolvedValueOnce({ setupComplete: true })
+    checkSetupCompleteMock.mockReturnValueOnce(Effect.succeed({ setupComplete: true }))
 
     const store = useAuthStore()
 
@@ -85,7 +86,7 @@ describe('auth store checkSetup', () => {
 
   it('falls back to setup complete when the config check fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    checkSetupCompleteMock.mockRejectedValueOnce(new Error('network down'))
+    checkSetupCompleteMock.mockReturnValueOnce(Effect.fail(new Error('network down')))
 
     const store = useAuthStore()
 

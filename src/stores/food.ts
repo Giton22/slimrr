@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
@@ -12,6 +13,7 @@ import type {
   FoodSearchSource,
   MealType,
 } from '@/types'
+import { fromPbPromise, runPb } from '@/lib/effect'
 import { pb, COLLECTIONS } from '@/lib/pocketbase'
 import type {
   FoodFavoriteRecord,
@@ -162,7 +164,7 @@ export const useFoodStore = defineStore('food', () => {
 
   async function checkVisionStatus() {
     try {
-      visionConfigured.value = await checkVisionConfiguration()
+      visionConfigured.value = await runPb(checkVisionConfiguration())
     } catch {
       visionConfigured.value = false
     }
@@ -170,7 +172,7 @@ export const useFoodStore = defineStore('food', () => {
 
   async function parseNutritionLabel(imageFile: File): Promise<OFFSearchResult | null> {
     try {
-      return await parseNutritionLabelImage(imageFile)
+      return await runPb(parseNutritionLabelImage(imageFile))
     } catch {
       return null
     }
@@ -182,7 +184,7 @@ export const useFoodStore = defineStore('food', () => {
 
     isLoading.value = true
     try {
-      const data = await loadFoodDashboardRepositoryData(userId)
+      const data = await runPb(loadFoodDashboardRepositoryData(userId))
       foodItems.value = data.foodItems
       foodLog.value = data.foodLog
       favorites.value = dedupeByFoodItem(
@@ -220,7 +222,9 @@ export const useFoodStore = defineStore('food', () => {
 
     isSearching.value = true
     try {
-      const results = await searchFoodDatabase(query)
+      const results = await runPb(
+        searchFoodDatabase(query).pipe(Effect.catchAll(() => Effect.succeed([]))),
+      )
       searchResults.value = results
       return results
     } catch {
@@ -234,7 +238,7 @@ export const useFoodStore = defineStore('food', () => {
   async function lookupBarcode(code: string): Promise<OFFSearchResult | null> {
     isLookingUpBarcode.value = true
     try {
-      return await lookupFoodBarcode(code)
+      return await runPb(lookupFoodBarcode(code))
     } catch {
       return null
     } finally {
@@ -251,7 +255,7 @@ export const useFoodStore = defineStore('food', () => {
       if (existingBarcodeMatch) return existingBarcodeMatch
     }
 
-    const foodItem = await createFoodItemRecord(userId, item)
+    const foodItem = await runPb(createFoodItemRecord(userId, item))
     if (!foodItems.value.some((f) => f.id === foodItem.id)) {
       foodItems.value.push(foodItem)
       foodItems.value.sort((a, b) => a.name.localeCompare(b.name))
@@ -277,9 +281,13 @@ export const useFoodStore = defineStore('food', () => {
     }
 
     if (existing) {
-      const updated = await pb
-        .collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS)
-        .update(existing.id, payload)
+      const updated = await runPb(
+        fromPbPromise(
+          (pb) =>
+            pb.collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS).update(existing.id, payload),
+          COLLECTIONS.FOOD_RECENTS,
+        ),
+      )
       const next = toFoodRecent(updated)
       recents.value = dedupeByFoodItem(
         [next, ...recents.value.filter((item) => item.id !== existing.id)],
@@ -289,7 +297,12 @@ export const useFoodStore = defineStore('food', () => {
       return
     }
 
-    const created = await pb.collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS).create(payload)
+    const created = await runPb(
+      fromPbPromise(
+        (pb) => pb.collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS).create(payload),
+        COLLECTIONS.FOOD_RECENTS,
+      ),
+    )
     recents.value = dedupeByFoodItem(
       [toFoodRecent(created), ...recents.value],
       (current, incoming) =>
@@ -315,9 +328,15 @@ export const useFoodStore = defineStore('food', () => {
     }
 
     if (existing) {
-      const updated = await pb
-        .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
-        .update(existing.id, payload)
+      const updated = await runPb(
+        fromPbPromise(
+          (pb) =>
+            pb
+              .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
+              .update(existing.id, payload),
+          COLLECTIONS.FOOD_FREQUENT,
+        ),
+      )
       const next = toFoodFrequent(updated)
       frequent.value = dedupeByFoodItem(
         [next, ...frequent.value.filter((item) => item.id !== existing.id)],
@@ -329,9 +348,12 @@ export const useFoodStore = defineStore('food', () => {
       return
     }
 
-    const created = await pb
-      .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
-      .create(payload)
+    const created = await runPb(
+      fromPbPromise(
+        (pb) => pb.collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT).create(payload),
+        COLLECTIONS.FOOD_FREQUENT,
+      ),
+    )
     frequent.value = dedupeByFoodItem(
       [toFoodFrequent(created), ...frequent.value],
       (current, incoming) =>
@@ -359,11 +381,21 @@ export const useFoodStore = defineStore('food', () => {
 
     if (relatedEntries.length === 0) {
       if (existingRecent) {
-        await pb.collection(COLLECTIONS.FOOD_RECENTS).delete(existingRecent.id)
+        await runPb(
+          fromPbPromise(
+            (pb) => pb.collection(COLLECTIONS.FOOD_RECENTS).delete(existingRecent.id),
+            COLLECTIONS.FOOD_RECENTS,
+          ),
+        )
         recents.value = recents.value.filter((item) => item.id !== existingRecent.id)
       }
       if (existingFrequent) {
-        await pb.collection(COLLECTIONS.FOOD_FREQUENT).delete(existingFrequent.id)
+        await runPb(
+          fromPbPromise(
+            (pb) => pb.collection(COLLECTIONS.FOOD_FREQUENT).delete(existingFrequent.id),
+            COLLECTIONS.FOOD_FREQUENT,
+          ),
+        )
         frequent.value = frequent.value.filter((item) => item.id !== existingFrequent.id)
       }
       return
@@ -381,32 +413,50 @@ export const useFoodStore = defineStore('food', () => {
     }
 
     if (existingRecent) {
-      const updated = await pb
-        .collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS)
-        .update(existingRecent.id, payload)
+      const updated = await runPb(
+        fromPbPromise(
+          (pb) =>
+            pb
+              .collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS)
+              .update(existingRecent.id, payload),
+          COLLECTIONS.FOOD_RECENTS,
+        ),
+      )
       recents.value = [
         toFoodRecent(updated),
         ...recents.value.filter((item) => item.id !== existingRecent.id),
       ]
     } else {
-      const created = await pb
-        .collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS)
-        .create(payload)
+      const created = await runPb(
+        fromPbPromise(
+          (pb) => pb.collection<FoodRecentRecord>(COLLECTIONS.FOOD_RECENTS).create(payload),
+          COLLECTIONS.FOOD_RECENTS,
+        ),
+      )
       recents.value = [toFoodRecent(created), ...recents.value]
     }
 
     if (existingFrequent) {
-      const updated = await pb
-        .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
-        .update(existingFrequent.id, payload)
+      const updated = await runPb(
+        fromPbPromise(
+          (pb) =>
+            pb
+              .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
+              .update(existingFrequent.id, payload),
+          COLLECTIONS.FOOD_FREQUENT,
+        ),
+      )
       frequent.value = [
         toFoodFrequent(updated),
         ...frequent.value.filter((item) => item.id !== existingFrequent.id),
       ]
     } else {
-      const created = await pb
-        .collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT)
-        .create(payload)
+      const created = await runPb(
+        fromPbPromise(
+          (pb) => pb.collection<FoodFrequentRecord>(COLLECTIONS.FOOD_FREQUENT).create(payload),
+          COLLECTIONS.FOOD_FREQUENT,
+        ),
+      )
       frequent.value = [toFoodFrequent(created), ...frequent.value]
     }
   }
@@ -419,7 +469,12 @@ export const useFoodStore = defineStore('food', () => {
     if (existing) {
       favorites.value = favorites.value.filter((item) => item.foodItem !== foodItemId)
       try {
-        await pb.collection(COLLECTIONS.FOOD_FAVORITES).delete(existing.id)
+        await runPb(
+          fromPbPromise(
+            (pb) => pb.collection(COLLECTIONS.FOOD_FAVORITES).delete(existing.id),
+            COLLECTIONS.FOOD_FAVORITES,
+          ),
+        )
       } catch (error) {
         favorites.value = [existing, ...favorites.value]
         throw error
@@ -427,10 +482,16 @@ export const useFoodStore = defineStore('food', () => {
       return false
     }
 
-    const created = await pb.collection<FoodFavoriteRecord>(COLLECTIONS.FOOD_FAVORITES).create({
-      user: userId,
-      food_item: foodItemId,
-    })
+    const created = await runPb(
+      fromPbPromise(
+        (pb) =>
+          pb.collection<FoodFavoriteRecord>(COLLECTIONS.FOOD_FAVORITES).create({
+            user: userId,
+            food_item: foodItemId,
+          }),
+        COLLECTIONS.FOOD_FAVORITES,
+      ),
+    )
     favorites.value = dedupeByFoodItem(
       [toFoodFavorite(created), ...favorites.value],
       (current, next) => (next.created ?? '').localeCompare(current.created ?? '') > 0,
@@ -456,19 +517,25 @@ export const useFoodStore = defineStore('food', () => {
     const foodName = payload.foodName ?? foodItem?.name ?? 'Quick entry'
 
     try {
-      const rec = await pb.collection<FoodLogRecord>(COLLECTIONS.FOOD_LOG).create({
-        user: userId,
-        date: payload.date,
-        meal_type: payload.mealType,
-        food_item: foodItem?.id ?? '',
-        food_name: foodName,
-        amount_g: payload.amountG,
-        calories,
-        protein,
-        carbs,
-        fat,
-        note: payload.note ?? '',
-      })
+      const rec = await runPb(
+        fromPbPromise(
+          (pb) =>
+            pb.collection<FoodLogRecord>(COLLECTIONS.FOOD_LOG).create({
+              user: userId,
+              date: payload.date,
+              meal_type: payload.mealType,
+              food_item: foodItem?.id ?? '',
+              food_name: foodName,
+              amount_g: payload.amountG,
+              calories,
+              protein,
+              carbs,
+              fat,
+              note: payload.note ?? '',
+            }),
+          COLLECTIONS.FOOD_LOG,
+        ),
+      )
 
       const entry = toFoodLogEntry(rec)
       if (!foodLog.value.some((e) => e.id === entry.id)) {
@@ -516,7 +583,12 @@ export const useFoodStore = defineStore('food', () => {
     if (patch.note !== undefined) payload.note = patch.note ?? ''
 
     try {
-      await pb.collection(COLLECTIONS.FOOD_LOG).update(id, payload)
+      await runPb(
+        fromPbPromise(
+          (pb) => pb.collection(COLLECTIONS.FOOD_LOG).update(id, payload),
+          COLLECTIONS.FOOD_LOG,
+        ),
+      )
       const idx = foodLog.value.findIndex((e) => e.id === id)
       if (idx !== -1) {
         foodLog.value[idx] = { ...existing, ...patch }
@@ -532,7 +604,9 @@ export const useFoodStore = defineStore('food', () => {
   async function deleteFoodLogEntry(id: string) {
     const existing = foodLog.value.find((e) => e.id === id)
     try {
-      await pb.collection(COLLECTIONS.FOOD_LOG).delete(id)
+      await runPb(
+        fromPbPromise((pb) => pb.collection(COLLECTIONS.FOOD_LOG).delete(id), COLLECTIONS.FOOD_LOG),
+      )
       foodLog.value = foodLog.value.filter((e) => e.id !== id)
       if (existing?.foodItem) {
         await recomputeUsageCollections(existing.foodItem)

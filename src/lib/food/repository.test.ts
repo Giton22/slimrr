@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { Effect } from 'effect'
 
 const {
   filterMock,
@@ -33,6 +34,7 @@ vi.mock('@/lib/pocketbase', () => ({
   },
 }))
 
+import { PocketBaseService } from '@/lib/effect'
 import {
   checkVisionConfiguration,
   createFoodItemRecord,
@@ -51,6 +53,16 @@ function collectionApi() {
     subscribe: subscribeMock,
     unsubscribe: unsubscribeMock,
   }
+}
+
+const mockPb = {
+  filter: filterMock,
+  send: sendMock,
+  collection: collectionMock,
+}
+
+function runWithPb<A>(effect: Effect.Effect<A, unknown, PocketBaseService>) {
+  return Effect.runPromise(effect.pipe(Effect.provideService(PocketBaseService, mockPb as never)))
 }
 
 describe('food repository', () => {
@@ -124,7 +136,7 @@ describe('food repository', () => {
         },
       ])
 
-    const result = await loadFoodDashboardRepositoryData('user-1')
+    const result = await runWithPb(loadFoodDashboardRepositoryData('user-1'))
 
     expect(result.foodItems).toEqual([
       {
@@ -154,12 +166,14 @@ describe('food repository', () => {
       .mockResolvedValueOnce({ name: 'Milk' })
       .mockResolvedValueOnce({ name: 'Nutrition Label' })
 
-    await expect(checkVisionConfiguration()).resolves.toBe(true)
-    await expect(searchFoodDatabase('banana')).resolves.toEqual([{ name: 'Banana' }])
-    await expect(lookupFoodBarcode('123')).resolves.toEqual({ name: 'Milk' })
+    await expect(runWithPb(checkVisionConfiguration())).resolves.toBe(true)
+    await expect(runWithPb(searchFoodDatabase('banana'))).resolves.toEqual([{ name: 'Banana' }])
+    await expect(runWithPb(lookupFoodBarcode('123'))).resolves.toEqual({ name: 'Milk' })
 
     const file = new File(['img'], 'label.jpg', { type: 'image/jpeg' })
-    await expect(parseNutritionLabelImage(file)).resolves.toEqual({ name: 'Nutrition Label' })
+    await expect(runWithPb(parseNutritionLabelImage(file))).resolves.toEqual({
+      name: 'Nutrition Label',
+    })
   })
 
   it('creates mapped food items and wires realtime subscriptions', async () => {
@@ -178,15 +192,17 @@ describe('food repository', () => {
     })
 
     await expect(
-      createFoodItemRecord('user-1', {
-        name: 'Oats',
-        caloriesPer100g: 389,
-        proteinPer100g: 17,
-        carbsPer100g: 66,
-        fatPer100g: 7,
-        defaultServingG: 40,
-        source: 'manual',
-      }),
+      runWithPb(
+        createFoodItemRecord('user-1', {
+          name: 'Oats',
+          caloriesPer100g: 389,
+          proteinPer100g: 17,
+          carbsPer100g: 66,
+          fatPer100g: 7,
+          defaultServingG: 40,
+          source: 'manual',
+        }),
+      ),
     ).resolves.toEqual({
       id: 'item-2',
       name: 'Oats',
