@@ -73,6 +73,9 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(vue@3.6.0-beta.7(typescript@5.9.3))
     devDependencies:
+      '@effect/language-service':
+        specifier: ^0.82.0
+        version: 0.82.0
       '@iconify-json/lucide':
         specifier: ^1.2.96
         version: 1.2.97
@@ -671,6 +674,10 @@ packages:
   '@babel/types@7.29.0':
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
+
+  '@effect/language-service@0.82.0':
+    resolution: {integrity: sha512-eskYmyBk8ZcltrA3+NOvQBvQmCEGglTSdU4dUVHGDt8M7vinpialRE3mrBc+WxSdi0omfIwSICy3nrSZ+cFsaQ==}
+    hasBin: true
 
   '@emotion/babel-plugin@11.13.5':
     resolution: {integrity: sha512-pxHCpT2ex+0q+HH91/zsdHkw/lXd468DIN2zvfvLtPKLLMo6gQj7oLObq8PhkrxOZb/gGCq03S3Z7PDhS8pduQ==}
@@ -4707,6 +4714,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
+
+  '@effect/language-service@0.82.0': {}
 
   '@emotion/babel-plugin@11.13.5':
     dependencies:

@@ -25,3 +25,40 @@ export type PocketBaseError =
   | NetworkError
   | ValidationError
   | UnknownPbError
+
+export class NotAuthenticatedError extends Data.TaggedError('NotAuthenticatedError')<{
+  readonly message: string
+}> {}
+
+export class DuplicateGroupMembershipError extends Data.TaggedError(
+  'DuplicateGroupMembershipError',
+)<{
+  readonly groupId: string
+  readonly message: string
+}> {}
+
+export class InvalidGoalStateError extends Data.TaggedError('InvalidGoalStateError')<{
+  readonly message: string
+}> {}
+
+export class DetachedFoodItemError extends Data.TaggedError('DetachedFoodItemError')<{
+  readonly foodItemId: string
+  readonly message: string
+}> {}
+
+export class OptimisticUpdateRollbackError extends Data.TaggedError(
+  'OptimisticUpdateRollbackError',
+)<{
+  readonly message: string
+  readonly cause: unknown
+  readonly rollbackCause: unknown
+}> {}
+
+export type DomainError =
+  | NotAuthenticatedError
+  | DuplicateGroupMembershipError
+  | InvalidGoalStateError
+  | DetachedFoodItemError
+  | OptimisticUpdateRollbackError
+
+export type AppError = PocketBaseError | DomainError

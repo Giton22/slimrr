@@ -39,6 +39,7 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
+    "@effect/language-service": "^0.82.0",
     "@iconify-json/lucide": "^1.2.96",
     "@iconify/vue": "^5.0.0",
     "@tsconfig/node24": "^24.0.4",
